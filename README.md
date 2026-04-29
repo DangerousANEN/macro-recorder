@@ -1,19 +1,34 @@
 # 🎬 Macro Recorder
 
-Записывайте действия в браузере и воспроизводите их автоматически.
+Записывайте действия в браузере и воспроизводите их автоматически через
+Playwright. Поддержка профилей, прокси, 2FA, SMS, captcha, циклов, условий,
+дозаписи, отладчика и **MCP** (управление через LLM-агента: Claude Desktop,
+Cursor, Devin).
 
 ## Архитектура
 
 ```
 Chrome Extension (запись)  →  WebSocket  →  Server (localhost:3700)
-                                              ├── REST API (хранение макросов)
-                                              ├── Web Editor (редактор шагов)
-                                              └── Playwright Player (воспроизведение)
+                                              ├── REST API + WS
+                                              ├── Web Editor (editor/)
+                                              ├── Playwright Player
+                                              └── MCP stdio (mcp/)
 ```
+
+| Слой | Файл | Что делает |
+| --- | --- | --- |
+| HTTP API + WebSocket | `server/index.js` | Routes `/api/macros`, `/api/snapshots`, `/api/running`, broadcasts run events. |
+| Player | `server/player.js` | Воспроизведение макроса через Playwright. Управляет браузером, переменными, контролем потока. |
+| Selectors | `server/selectors.js` | `resolveSelector` (`@named`), `smartClick`, `smartFill` с fallback'ами. |
+| Snapshot GC | `server/snapshot-gc.js` | Автоматическая чистка `data/snapshots/`. |
+| Settings | `server/settings.js` | Глобальные переменные, persistent vars, savedSelectors. |
+| Editor | `editor/index.html` + `app.js` | UI для редактирования / запуска / отладки. |
+| Block defs | `data/blocks/<name>.json` | Метаданные действий (icon, name, color, fields). |
+| MCP | `mcp/index.js` | stdio-сервер с tools для LLM-агента. |
 
 ## Установка
 
-### 1. Сервер
+### Сервер
 
 ```bash
 cd server
@@ -22,48 +37,126 @@ npx playwright install chromium
 npm start
 ```
 
-Сервер запустится на `http://localhost:3700`
+Сервер слушает `http://127.0.0.1:3700` (можно переопределить `PORT` / `HOST`).
 
-### 2. Chrome Extension
+### Chrome Extension
 
-1. Откройте Chrome → `chrome://extensions/`
-2. Включите "Режим разработчика" (Developer mode)
-3. Нажмите "Загрузить распакованное расширение" (Load unpacked)
-4. Выберите папку `extension/`
+1. Chrome → `chrome://extensions/`
+2. Developer mode ON → Load unpacked → выбрать `extension/`
 
-## Использование
+### MCP сервер (опционально)
 
-### Запись макроса
+```bash
+cd mcp
+npm install
+```
 
-1. Нажмите на иконку расширения в Chrome
-2. Введите название макроса
-3. Нажмите 🔴 **Записать**
-4. Кликайте по элементам на странице — появится меню действий:
-   - 📌 **Клик** — записать клик
-   - ✍️ **Ввести текст** — записать ввод текста
-   - 👁 **Прочитать текст** — записать чтение текста
-   - ⏳ **Ждать элемент** — записать ожидание
-   - 👆 **Настоящий клик (без записи)** — выполнить реальный клик для навигации
+Конфиг для Claude Desktop / Cursor / Devin — см. `mcp/README.md`.
 
-### Пауза/Продолжение
+## Запуск макросов
 
-Для записи многошаговых сценариев, где кнопка следующего шага появляется только после нажатия предыдущей:
+### Через UI
 
-- Нажмите **⏸ Пауза** → кликайте как обычно → нажмите **▶ Продолжить**
-- Или используйте **👆 Настоящий клик** — он выполнит клик без записи
+Откройте `http://localhost:3700`, выберите макрос, нажмите **▶▶ Запустить** или **🐛 Debug** для пошаговой отладки.
 
-### Редактор (localhost:3700)
+### Через API
 
-- Просмотр и редактирование шагов
-- Drag-and-drop для изменения порядка
-- ▶ Выполнить отдельный шаг
-- ⏩ Выполнить все шаги до выбранного
-- ▶▶ Запустить весь макрос
-- Ручное добавление шагов
+```bash
+curl -X POST http://localhost:3700/api/macros/<id>/run -H 'Content-Type: application/json' -d '{}'
+curl -X POST http://localhost:3700/api/macros/<id>/run-loop -d '{"times": 5, "tableName": "test_bots"}'
+curl -X POST http://localhost:3700/api/running/<runId>/stop
+```
+
+### Через MCP (LLM-агент)
+
+```
+list_macros        — список макросов
+get_macro(id)      — полный JSON
+run_macro(id)      — запустить
+stop_macro(runId)  — остановить
+list_running       — что запущено сейчас
+list_blocks        — какие шаги поддерживаются
+```
+
+## Возможности editor'а
+
+- Запись через Chrome extension + дозапись (🔴 **Дозапись** в toolbar)
+- Drag-and-drop порядок шагов
+- ▶ Запустить отдельный шаг / ⏩ Запустить до выбранного / ▶▶ Запустить всё
+- 🐛 Debug: breakpoints, step-over/into/out, переменные в реальном времени, **watch-выражения**
+- Ctrl+Z / Ctrl+Y — **undo / redo** на 50 шагов
+- Ctrl+D — дублировать шаг
+- Поиск макросов в sidebar
+- Экспорт / импорт макроса (JSON)
+- Контекстное меню на шаге (ПКМ): дублировать, вырезать, вставить, удалить
+- Variables panel + watch-выражения с поддержкой `{{template}}`
+
+## Поддерживаемые блоки (45+)
+
+**Базовые:** `click`, `type`, `read`, `wait`, `navigate`, `scroll`, `press-key`, `hover`, `delay`, `clear-field`
+
+**Управление:** `loop` (count/elements/table/while), `if`, `try-except`, `break`, `continue`, `set-variable`
+
+**Браузер:** `browser-init`, `switch-profile`, `tab-open`, `tab-switch`, `tab-close`, `set-cookie`, `clear-cookies`, `eval-js`
+
+**Данные:** `read-table`, `save-to-table`, `request-code`, `user-input`, `extract` (regex)
+
+**Проверки:** `assert`, `screenshot`, `debug-dump`
+
+Каждый шаг поддерживает:
+- `cssSelector` или `xpath`
+- `placeholder` для resilient lookup (`getByPlaceholder`)
+- `fallbackSelectors`: список альтернатив (CSS-строки или `{kind, value, name?}`)
+- `customLabel` для переименования в UI
+- `customName` для отображения вместо action name
+
+## Resilient selectors
+
+```json
+{
+  "action": "click",
+  "cssSelector": "#telegram-search-input",
+  "placeholder": "Search",
+  "fallbackSelectors": [
+    ".input-search-input",
+    "input[type=\"search\"]",
+    {"kind": "role", "value": "textbox", "name": "Search"}
+  ]
+}
+```
+
+Player перебирает попытки в таком порядке: primary CSS → raw recorded → xpath → placeholder → user fallbacks → site-specific эвристики (для Telegram /a/ и /k/ есть встроенные).
+
+## Snapshot auto-cleanup
+
+`data/snapshots/runtime/` очищается автоматически при старте сервера:
+
+```
+RUNTIME_SNAPSHOT_MAX_AGE_DAYS=7      # удалить runtime-снимки старше 7 дней
+EDITOR_SNAPSHOT_MAX_AGE_DAYS=30      # удалить editor-снимки старше 30 дней
+SNAPSHOT_KEEP_PER_DIR=200            # оставить максимум 200 файлов на директорию
+SNAPSHOT_GC_ON_BOOT=0                # отключить
+```
+
+Ручной запуск:
+
+```bash
+cd server && npm run gc:snapshots               # dry-run
+node scripts/gc-snapshots.mjs --apply           # реально удалить
+curl -X POST localhost:3700/api/snapshots/gc -d '{"apply":false}'
+```
+
+## Smoke tests
+
+```bash
+cd server && npm run smoke         # API contract: 36 проверок
+cd server && npm run smoke:mcp     # MCP stdio: initialize + tools/list + tools/call
+```
 
 ## Технологии
 
-- Node.js + Express + WebSocket
-- Playwright (воспроизведение)
+- Node.js 18+ + Express + ws
+- Playwright (chromium-only, headed)
 - Chrome Extension (Manifest V3)
 - Vanilla JS (без фреймворков)
+- `@modelcontextprotocol/sdk` для MCP

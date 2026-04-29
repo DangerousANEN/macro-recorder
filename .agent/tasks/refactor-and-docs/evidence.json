@@ -1,0 +1,14 @@
+{
+  "task": "refactor-and-docs",
+  "branch": "devin/1777473089-refactor-player",
+  "acs": {
+    "AC1_selectors_module": "PASS",
+    "AC2_player_delegates": "PASS",
+    "AC3_smoke": "PASS",
+    "AC4_skill": "PASS",
+    "AC5_readme": "PASS",
+    "AC6_no_regression": "PASS"
+  },
+  "smokeTest": { "command": "SMOKE_PORT=3708 node scripts/smoke-test.mjs", "result": "PASS" },
+  "refactor": { "playerBeforeLines": 3244, "playerAfterLines": 3046, "selectorsLines": 220 }
+}
