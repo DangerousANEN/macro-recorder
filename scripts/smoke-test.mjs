@@ -17,6 +17,9 @@ const REQUIRED_BLOCKS = [
   'loop', 'if', 'try-except', 'set-variable', 'break', 'continue',
   'assert', 'screenshot', 'extract',
   'browser-init', 'switch-profile', 'debug-dump',
+  'delay', 'set-cookie', 'clear-cookies',
+  'tab-open', 'tab-switch', 'tab-close',
+  'hover', 'eval-js',
 ];
 
 let failures = 0;

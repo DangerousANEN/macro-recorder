@@ -1865,6 +1865,129 @@ async function executeAtomicStep(p, step, path, wss, currentElement = null, exec
       case 'continue':
         throw new ContinueError();
 
+      case 'delay': {
+        // Fixed delayMs wins; otherwise fall back to delayMin/Max range (seconds).
+        let waitMs = 0;
+        if (step.delayMs !== undefined && step.delayMs !== '') {
+          waitMs = parseInt(resolveVars(String(step.delayMs), step._tableRow || {}, vars)) || 0;
+        } else {
+          const minS = parseFloat(step.delayMin ?? 0) || 0;
+          const maxS = parseFloat(step.delayMax ?? 0) || 0;
+          if (maxS > 0) {
+            const lo = Math.min(minS, maxS) * 1000;
+            const hi = Math.max(minS, maxS) * 1000;
+            waitMs = Math.round(lo + Math.random() * (hi - lo));
+          }
+        }
+        if (waitMs > 0) await new Promise(r => setTimeout(r, waitMs));
+        break;
+      }
+
+      case 'set-cookie': {
+        const name = resolveVars(step.cookieName || '', step._tableRow || {}, vars);
+        const value = resolveVars(step.cookieValue || '', step._tableRow || {}, vars);
+        if (!name) throw new Error('set-cookie: cookieName обязателен');
+        let domain = resolveVars(step.cookieDomain || '', step._tableRow || {}, vars);
+        if (!domain) {
+          try { domain = new URL(p.url()).hostname; } catch { domain = ''; }
+        }
+        const cookie = {
+          name,
+          value,
+          domain,
+          path: step.cookiePath || '/',
+        };
+        const expSec = parseInt(step.cookieExpires);
+        if (Number.isFinite(expSec) && expSec > 0) {
+          cookie.expires = Math.floor(Date.now() / 1000) + expSec;
+        }
+        await context.addCookies([cookie]);
+        broadcastStatus(wss, { type: 'cookie-set', path, name, domain });
+        break;
+      }
+
+      case 'clear-cookies': {
+        const domain = resolveVars(step.cookieDomain || '', step._tableRow || {}, vars);
+        if (domain) {
+          await context.clearCookies({ domain });
+        } else {
+          await context.clearCookies();
+        }
+        broadcastStatus(wss, { type: 'cookies-cleared', path, domain: domain || '*' });
+        break;
+      }
+
+      case 'tab-open': {
+        const url = resolveVars(step.url || '', step._tableRow || {}, vars);
+        const newPage = await context.newPage();
+        if (url) await newPage.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => {});
+        page = newPage;
+        const idx = context.pages().indexOf(newPage);
+        if (step.saveAs) vars[step.saveAs] = String(idx);
+        broadcastStatus(wss, { type: 'tab-opened', path, index: idx, url: newPage.url() });
+        break;
+      }
+
+      case 'tab-switch': {
+        const pages = context.pages();
+        let target = null;
+        const urlMatch = resolveVars(step.tabUrlContains || '', step._tableRow || {}, vars);
+        if (urlMatch) {
+          target = pages.find(pg => pg.url().includes(urlMatch));
+        }
+        if (!target && step.tabIndex !== undefined && step.tabIndex !== '') {
+          const idx = parseInt(resolveVars(String(step.tabIndex), step._tableRow || {}, vars));
+          if (Number.isFinite(idx) && pages[idx]) target = pages[idx];
+        }
+        if (!target) throw new Error(`tab-switch: вкладка не найдена (index=${step.tabIndex}, urlContains=${urlMatch})`);
+        await target.bringToFront().catch(() => {});
+        page = target;
+        broadcastStatus(wss, { type: 'tab-switched', path, index: pages.indexOf(target), url: target.url() });
+        break;
+      }
+
+      case 'tab-close': {
+        const pages = context.pages();
+        let target = p;
+        if (step.tabIndex !== undefined && step.tabIndex !== '') {
+          const idx = parseInt(resolveVars(String(step.tabIndex), step._tableRow || {}, vars));
+          if (Number.isFinite(idx) && pages[idx]) target = pages[idx];
+        }
+        const wasCurrent = target === p;
+        await target.close().catch(() => {});
+        if (wasCurrent) {
+          const remaining = context.pages();
+          if (remaining.length > 0) {
+            page = remaining[remaining.length - 1];
+            await page.bringToFront().catch(() => {});
+          }
+        }
+        broadcastStatus(wss, { type: 'tab-closed', path });
+        break;
+      }
+
+      case 'hover': {
+        if (useCurrentElement) {
+          await currentElement.hover({ timeout: defaultTimeout });
+        } else {
+          await p.locator(selector).first().hover({ timeout: defaultTimeout });
+        }
+        break;
+      }
+
+      case 'eval-js': {
+        const code = step.code || '';
+        if (!code) throw new Error('eval-js: code пустой');
+        // page.evaluate accepts a function body via `new Function` semantics — wrap as async fn.
+        const fn = new Function(`return (async () => { ${code} })();`);
+        const result = await p.evaluate(`(${fn.toString()})()`);
+        if (step.saveAs) {
+          vars[step.saveAs] = (typeof result === 'string') ? result : JSON.stringify(result ?? '');
+          broadcastStatus(wss, { type: 'var-saved', path, varName: step.saveAs, value: vars[step.saveAs] });
+        }
+        break;
+      }
+
       default:
         throw new Error(`Unknown action: ${step.action}`);
     }

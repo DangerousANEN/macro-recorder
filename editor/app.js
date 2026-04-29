@@ -17,7 +17,10 @@ const ACTION_ICONS = {
   'get-sms-number': '📱', 'wait-sms-code': '📞', 'solve-captcha': '🧩',
   'save-account': '📋', 'check-blocked': '🔍', 'human-delay': '⏱️', 'release-number': '📧',
   'browser-init': '🌐', 'switch-profile': '🧭',
-  'assert': '✅', 'screenshot': '📸', 'extract': '🔍'
+  'assert': '✅', 'screenshot': '📸', 'extract': '🔍',
+  'delay': '⏸', 'set-cookie': '🍪', 'clear-cookies': '🧹',
+  'tab-open': '🆕', 'tab-switch': '🗂', 'tab-close': '❌',
+  'hover': '👇', 'eval-js': '🔧'
 };
 const ACTION_NAMES = {
   click: 'Клик', type: 'Ввод текста', read: 'Чтение → переменная', wait: 'Ожидание',
@@ -45,7 +48,15 @@ const ACTION_NAMES = {
   'switch-profile': 'Сменить профиль',
   'assert': 'Проверка (assert)',
   'screenshot': 'Скриншот',
-  'extract': 'Извлечь (regex)'
+  'extract': 'Извлечь (regex)',
+  'delay': 'Пауза',
+  'set-cookie': 'Установить cookie',
+  'clear-cookies': 'Очистить cookies',
+  'tab-open': 'Открыть вкладку',
+  'tab-switch': 'Переключить вкладку',
+  'tab-close': 'Закрыть вкладку',
+  'hover': 'Hover',
+  'eval-js': 'Выполнить JS'
 };
 
 // AC6/AC7: Block definitions loaded from server
@@ -77,9 +88,9 @@ function resolveBlockDef(action) {
 }
 
 const BLOCK_ACTIONS = ['loop', 'loop-table', 'loop-elements', 'if', 'try-except'];
-const NEEDS_SELECTOR = ['click', 'type', 'read', 'wait', 'scroll', 'clear-field', 'loop', 'loop-elements'];
-const NEEDS_VALUE = ['type', 'type-current', 'navigate', 'save-to-table', 'set-variable'];
-const NEEDS_SAVEAS = ['read', 'read-current', 'request-code', 'user-input', 'read-table', 'set-variable'];
+const NEEDS_SELECTOR = ['click', 'type', 'read', 'wait', 'scroll', 'clear-field', 'loop', 'loop-elements', 'hover'];
+const NEEDS_VALUE = ['type', 'type-current', 'navigate', 'save-to-table', 'set-variable', 'tab-open'];
+const NEEDS_SAVEAS = ['read', 'read-current', 'request-code', 'user-input', 'read-table', 'set-variable', 'tab-open', 'eval-js'];
 const NEEDS_ENTER = ['type', 'type-current'];
 
 let savedSelectors = {}; // { name: "css-selector" }
@@ -1469,6 +1480,31 @@ function openStepConfigForEdit(path) {
     document.getElementById('cfgExtractGroup').value = step.group ?? 1;
     document.getElementById('cfgExtractSaveAs').value = step.saveAs || '';
   }
+  if (step.action === 'delay') {
+    document.getElementById('cfgDelayMs').value = step.delayMs || '';
+    document.getElementById('cfgDelayMin').value = step.delayMin || '';
+    document.getElementById('cfgDelayMax').value = step.delayMax || '';
+  }
+  if (step.action === 'set-cookie') {
+    document.getElementById('cfgCookieName').value = step.cookieName || '';
+    document.getElementById('cfgCookieValue').value = step.cookieValue || '';
+    document.getElementById('cfgCookieDomain').value = step.cookieDomain || '';
+    document.getElementById('cfgCookiePath').value = step.cookiePath || '/';
+    document.getElementById('cfgCookieExpires').value = step.cookieExpires || '';
+  }
+  if (step.action === 'clear-cookies') {
+    document.getElementById('cfgClearCookieDomain').value = step.cookieDomain || '';
+  }
+  if (step.action === 'tab-switch') {
+    document.getElementById('cfgTabIndex').value = step.tabIndex ?? '';
+    document.getElementById('cfgTabUrlContains').value = step.tabUrlContains || '';
+  }
+  if (step.action === 'tab-close') {
+    document.getElementById('cfgTabCloseIndex').value = step.tabIndex ?? '';
+  }
+  if (step.action === 'eval-js') {
+    document.getElementById('cfgEvalJsCode').value = step.code || '';
+  }
   if (step.action === 'try-except') {
     document.getElementById('cfgOnError').value = step.onError || 'continue';
     document.getElementById('cfgExceptError').value = step.exceptError || '';
@@ -1691,6 +1727,14 @@ function showConfigFields(action) {
   if (action === 'extract') {
     document.getElementById('cfgExtractSection').classList.add('visible');
   }
+
+  // Delay / cookie / tab / eval-js sections
+  if (action === 'delay') document.getElementById('cfgDelaySection').classList.add('visible');
+  if (action === 'set-cookie') document.getElementById('cfgSetCookieSection').classList.add('visible');
+  if (action === 'clear-cookies') document.getElementById('cfgClearCookiesSection').classList.add('visible');
+  if (action === 'tab-switch') document.getElementById('cfgTabSwitchSection').classList.add('visible');
+  if (action === 'tab-close') document.getElementById('cfgTabCloseSection').classList.add('visible');
+  if (action === 'eval-js') document.getElementById('cfgEvalJsSection').classList.add('visible');
 }
 
 function populateTableSelect(selectId, selectedVal) {
@@ -1945,6 +1989,31 @@ document.getElementById('confirmStepConfig').addEventListener('click', () => {
     step.flags = document.getElementById('cfgExtractFlags').value || 'i';
     step.group = document.getElementById('cfgExtractGroup').value || '1';
     step.saveAs = document.getElementById('cfgExtractSaveAs').value || '';
+  }
+  if (action === 'delay') {
+    step.delayMs = document.getElementById('cfgDelayMs').value || '';
+    step.delayMin = document.getElementById('cfgDelayMin').value || '';
+    step.delayMax = document.getElementById('cfgDelayMax').value || '';
+  }
+  if (action === 'set-cookie') {
+    step.cookieName = document.getElementById('cfgCookieName').value || '';
+    step.cookieValue = document.getElementById('cfgCookieValue').value || '';
+    step.cookieDomain = document.getElementById('cfgCookieDomain').value || '';
+    step.cookiePath = document.getElementById('cfgCookiePath').value || '/';
+    step.cookieExpires = document.getElementById('cfgCookieExpires').value || '';
+  }
+  if (action === 'clear-cookies') {
+    step.cookieDomain = document.getElementById('cfgClearCookieDomain').value || '';
+  }
+  if (action === 'tab-switch') {
+    step.tabIndex = document.getElementById('cfgTabIndex').value || '';
+    step.tabUrlContains = document.getElementById('cfgTabUrlContains').value || '';
+  }
+  if (action === 'tab-close') {
+    step.tabIndex = document.getElementById('cfgTabCloseIndex').value || '';
+  }
+  if (action === 'eval-js') {
+    step.code = document.getElementById('cfgEvalJsCode').value || '';
   }
   if (action === 'try-except') {
     step.onError = document.getElementById('cfgOnError').value || 'continue';
