@@ -1,0 +1,81 @@
+{
+  "smsServices": {
+    "active": "",
+    "services": {
+      "sms-activate": {
+        "apiKey": "",
+        "baseUrl": "https://api.sms-activate.org/stubs/handler_api.php"
+      },
+      "5sim": {
+        "apiKey": "",
+        "baseUrl": "https://5sim.net/v1"
+      },
+      "smshub": {
+        "apiKey": "",
+        "baseUrl": "http://smshub.org/stubs/handler_api.php"
+      },
+      "custom": {
+        "apiKey": "",
+        "baseUrl": ""
+      }
+    }
+  },
+  "proxy": {
+    "enabled": true,
+    "type": "http",
+    "host": "",
+    "port": "",
+    "username": "",
+    "password": "",
+    "rotationUrl": "",
+    "list": []
+  },
+  "fingerprint": {
+    "enabled": false,
+    "userAgent": "",
+    "language": "ru-RU",
+    "timezone": "Europe/Moscow",
+    "screenResolution": "1920x1080",
+    "webglVendor": "",
+    "platform": "Win32",
+    "hardwareConcurrency": 8,
+    "deviceMemory": 8
+  },
+  "cookies": {
+    "autoSave": true,
+    "autoLoad": true,
+    "profiles": {}
+  },
+  "variables": {},
+  "dataTables": {},
+  "browserProfiles": {},
+  "savedSelectors": {},
+  "timeout": 30000,
+  "browser": {
+    "headless": false
+  },
+  "captchaServices": {
+    "active": "2captcha",
+    "services": {
+      "2captcha": {
+        "apiKey": ""
+      },
+      "anticaptcha": {
+        "apiKey": ""
+      }
+    }
+  },
+  "autoregConfig": {
+    "defaultCountry": "ru",
+    "successRateThreshold": 30,
+    "maxRetries": 3,
+    "delayMultiplier": 1,
+    "smsTimeout": 120,
+    "smsCheckInterval": 5
+  },
+  "debug": {
+    "clickShots": true,
+    "disableOverlayDismiss": false
+  },
+  "_persistentVars": {}
+}

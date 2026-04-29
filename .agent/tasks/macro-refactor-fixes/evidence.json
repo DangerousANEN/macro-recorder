@@ -1,0 +1,48 @@
+{
+  "task": "macro-refactor-fixes",
+  "round": 2,
+  "timestamp": "2026-03-25T11:36:00Z",
+  "bugs_fixed": [
+    {
+      "id": "python-double-exec",
+      "title": "Python blocks execute twice",
+      "root_cause": "executePython() broadcasts output real-time AND callers re-broadcast pyResult.output",
+      "fix": "Removed 3 duplicate broadcastStatus python-output calls from callers in server/player.js",
+      "files": ["server/player.js"],
+      "lines_changed": 3,
+      "risk": "low"
+    },
+    {
+      "id": "debug-restart-crash",
+      "title": "Debug mode crashes on second restart",
+      "root_cause": "Old child process close event deletes new process from runningDebugProcesses and broadcasts 'finished'",
+      "fix": "Guard close/error handlers with process identity check; delete old entry before spawning new one",
+      "files": ["server/index.js"],
+      "lines_changed": 8,
+      "risk": "low"
+    },
+    {
+      "id": "python-utf8-encoding",
+      "title": "UnicodeDecodeError with Chinese text",
+      "root_cause": "Python wrapper open() without encoding='utf-8' defaults to system locale on Windows",
+      "fix": "Added encoding='utf-8' to open() calls and ensure_ascii=False to json.dump() in both wrappers",
+      "files": ["server/player.js", "server/index.js"],
+      "lines_changed": 4,
+      "risk": "low"
+    },
+    {
+      "id": "composite-block-drag-broken",
+      "title": "Drag-and-drop broken for composite blocks",
+      "root_cause": "dragstart e.target is the draggable block-container, not the clicked element; header.contains(e.target) always false",
+      "fix": "Track mousedown target via capture-phase listener; use real click target for header containment check in dragstart",
+      "files": ["editor/app.js"],
+      "lines_changed": 5,
+      "risk": "low"
+    }
+  ],
+  "syntax_check": {
+    "server_index_js": "PASS",
+    "server_player_js": "PASS"
+  },
+  "regression_risk": "minimal — all changes are additive guards or removal of duplicate calls"
+}

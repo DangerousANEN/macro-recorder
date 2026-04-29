@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 320px;
+      min-height: 200px;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      padding: 16px;
+    }
+    h1 { font-size: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .status { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 8px 12px; background: #313244; border-radius: 8px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #585b70; }
+    .status-dot.recording { background: #f38ba8; animation: pulse 1.5s infinite; }
+    .status-dot.paused { background: #fab387; }
+    .status-dot.connected { background: #a6e3a1; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    
+    .input-group { margin-bottom: 12px; }
+    .input-group label { display: block; font-size: 11px; color: #a6adc8; margin-bottom: 4px; }
+    .input-group input {
+      width: 100%;
+      padding: 8px 10px;
+      background: #313244;
+      border: 1px solid #45475a;
+      color: #cdd6f4;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+    .input-group input:focus { border-color: #89b4fa; }
+    
+    .btn-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-record { background: #f38ba8; color: #1e1e2e; }
+    .btn-record:hover { background: #eba0ac; }
+    .btn-stop { background: #45475a; color: #cdd6f4; }
+    .btn-stop:hover { background: #585b70; }
+    .btn-editor { background: #89b4fa; color: #1e1e2e; }
+    .btn-editor:hover { background: #74c7ec; }
+    .btn-editor { margin-top: 4px; }
+    
+    .steps-list { max-height: 200px; overflow-y: auto; }
+    .step-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px; background: #313244; border-radius: 6px; margin-bottom: 4px;
+      font-size: 12px;
+    }
+    .step-icon { font-size: 14px; }
+    .step-info { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .step-selector { font-size: 10px; color: #6c7086; display: block; overflow: hidden; text-overflow: ellipsis; }
+    
+    .section-title { font-size: 11px; color: #a6adc8; margin: 10px 0 6px; text-transform: uppercase; letter-spacing: 1px; }
+    
+    a { color: #89b4fa; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>🎬 Macro Recorder</h1>
+  
+  <div class="status" id="status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Не записывает</span>
+  </div>
+  
+  <div class="input-group" id="nameGroup">
+    <label>Название макроса</label>
+    <input type="text" id="macroName" placeholder="Новый макрос" value="">
+  </div>
+  
+  <div class="btn-row">
+    <button class="btn-record" id="recordBtn">🔴 Записать</button>
+    <button class="btn-stop" id="stopBtn" style="display:none">⏹ Стоп</button>
+  </div>
+  
+  <div id="stepsSection" style="display:none">
+    <div class="section-title">Записанные шаги</div>
+    <div class="steps-list" id="stepsList"></div>
+  </div>
+  
+  <button class="btn-editor" id="editorBtn" style="width:100%">📝 Открыть редактор</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>

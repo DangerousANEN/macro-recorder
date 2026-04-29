@@ -1,0 +1,43 @@
+{
+  "task": "macro-refactor-fixes",
+  "verifier": "coder-subagent",
+  "timestamp": "2026-03-25T11:36:00Z",
+  "verdict": "FIXED",
+  "round": 2,
+  "previous_verdict": "PASS",
+  "new_bugs_found": 3,
+  "new_bugs_fixed": 3,
+  "build": {
+    "server_starts": "PASS",
+    "editor_loads": "PASS",
+    "api_blocks_200": "PASS",
+    "api_variables_200": "PASS",
+    "no_stderr_errors": "PASS",
+    "syntax_check_player": "PASS",
+    "syntax_check_index": "PASS"
+  },
+  "acceptance_criteria": {
+    "AC1":  { "status": "PASS", "verified": "startDebug() reads #runProfileSelect.value, includes profileName in POST body" },
+    "AC2":  { "status": "PASS", "verified": "debugAutoscroll=false default, toggle button in HTML, highlightDebugStep/renderConsole check flags" },
+    "AC3":  { "status": "PASS", "verified": "explicit continue after loop handler in executeSteps prevents fall-through to atomic handler" },
+    "AC4":  { "status": "PASS", "verified": "contextmenu listener checks .step-card then .block-header/.block-container[data-path], uses data-path" },
+    "AC5":  { "status": "PASS", "verified": "data/python/ exists, player reads step.pyFile from PYTHON_DIR, pyFile takes precedence over pyOverride" },
+    "AC6":  { "status": "PASS", "verified": "data/blocks/ has 27 JSON files, GET /api/blocks returns 200 with 2990 bytes, editor loads via loadBlockDefinitions()" },
+    "AC7":  { "status": "PASS", "verified": "resolveBlockDef() resolves from blockDefinitions with fallback to ACTION_ICONS/ACTION_NAMES then ❓" },
+    "AC8":  { "status": "PASS", "verified": "persistent.json in data/variables/, loadPersistentVars/savePersistentVars in settings.js, player loads at start and saves after execution" },
+    "AC9":  { "status": "PASS", "verified": "data/variables/README.md documents all fields and filters" },
+    "AC10": { "status": "PASS", "verified": "step.disabled toggle on cards/blocks, .step-disabled CSS, player skips with step-skipped broadcast" },
+    "AC11": { "status": "PASS", "verified": ".drag-insert-line CSS, showInsertionLine() inserts before target, clearAllDragStyles removes" },
+    "AC12": { "status": "PASS", "verified": "DATA_ROOT=join(PROJECT_ROOT,'data'), all paths under data/" }
+  },
+  "round2_fixes": {
+    "python-double-exec":   { "status": "FIXED", "detail": "Removed 3 duplicate python-output broadcasts from callers — executePython already broadcasts in real-time" },
+    "debug-restart-crash":  { "status": "FIXED", "detail": "close/error handlers now check process identity before cleanup/broadcast; old entry deleted before spawn" },
+    "python-utf8-encoding": { "status": "FIXED", "detail": "Added encoding='utf-8' to open() and ensure_ascii=False to json.dump() in both Python wrapper templates" }
+  },
+  "notes": [
+    "All 12 original ACs remain PASS — no regressions from round 2 fixes",
+    "Round 2 fixes are minimal: 3 line removals, 4 line modifications, 8 lines in close/error guard",
+    "Syntax verified with node --check for both modified files"
+  ]
+}

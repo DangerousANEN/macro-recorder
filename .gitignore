@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+package-lock.json
+!server/package-lock.json
+
+# Runtime data (user data, not source)
+data/profiles/
+data/snapshots/
+data/macros/snapshots/
+server/data/profiles/
+server/data/snapshots/
+server/data/macros/
+macros/profiles/
+macros/snapshots/
+
+# User CSV records
+data/accounts/blocked-ips.csv
+data/accounts/failed.csv
+data/accounts/in-progress.csv
+data/accounts/registered.csv
+data/readed.csv
+
+# Macro recordings (user content) — keep .gitkeep
+data/macros/*.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Backups
+*.bak
+*.zip
+F:\\*
+
+# User macros (keep tiny example seeds only)
+data/macros/tg3-rotate-001.json
+data/macros/88e96f45-6ac7-44c5-8565-b605efd97fab.json
