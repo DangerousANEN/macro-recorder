@@ -1,0 +1,1 @@
+{"name":"Чтение из таблицы","icon":"📖","color":"#fab387","type":"atomic","fields":["tableName","rowIndex","columnName","saveAs"]}

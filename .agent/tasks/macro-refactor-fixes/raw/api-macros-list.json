@@ -1,0 +1,51 @@
+[
+  {
+    "id": "88e96f45-6ac7-44c5-8565-b605efd97fab",
+    "name": "tg3",
+    "stepsCount": 6,
+    "createdAt": "2026-03-21T08:30:58.525Z",
+    "updatedAt": "2026-03-21T08:37:45.852Z"
+  },
+  {
+    "id": "e0c63447-0c1d-41d8-bfe4-42eb6e5a43f0",
+    "name": "tg2",
+    "stepsCount": 5,
+    "createdAt": "2026-03-20T10:29:54.385Z",
+    "updatedAt": "2026-03-21T08:24:55.763Z"
+  },
+  {
+    "id": "b843fea5-d3ff-44b2-83de-f3ee4151b79c",
+    "name": "Новый макрос",
+    "stepsCount": 0,
+    "createdAt": "2026-03-20T10:29:34.885Z",
+    "updatedAt": "2026-03-20T10:29:34.885Z"
+  },
+  {
+    "id": "fc7e4236-3d36-4ffc-9d15-3bac073bbbb2",
+    "name": "tg",
+    "stepsCount": 5,
+    "createdAt": "2026-03-19T20:06:27.542Z",
+    "updatedAt": "2026-03-20T10:26:52.238Z"
+  },
+  {
+    "id": "a1faa245-dcb3-44fe-8d99-ab9694a03b3e",
+    "name": "ab3",
+    "stepsCount": 2,
+    "createdAt": "2026-03-20T10:26:12.358Z",
+    "updatedAt": "2026-03-20T10:26:27.814Z"
+  },
+  {
+    "id": "eee56299-97a6-461f-a070-dc15301f5725",
+    "name": "ab2",
+    "stepsCount": 2,
+    "createdAt": "2026-03-20T10:22:53.543Z",
+    "updatedAt": "2026-03-20T10:23:02.770Z"
+  },
+  {
+    "id": "ffc115cb-1dec-41f3-baf6-180640009298",
+    "name": "ab",
+    "stepsCount": 2,
+    "createdAt": "2026-03-19T20:34:08.794Z",
+    "updatedAt": "2026-03-19T20:34:44.990Z"
+  }
+]

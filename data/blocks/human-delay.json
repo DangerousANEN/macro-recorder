@@ -1,0 +1,1 @@
+{"name":"Человеческая пауза","icon":"⏱️","color":"#a6e3a1","type":"atomic","category":"autoreg","fields":["minSeconds","maxSeconds","humanize"]}
