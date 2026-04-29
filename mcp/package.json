@@ -1,0 +1,16 @@
+{
+  "name": "macro-recorder-mcp",
+  "version": "0.1.0",
+  "description": "MCP stdio server exposing the Macro Recorder API as tools.",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "macro-recorder-mcp": "index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4"
+  }
+}
