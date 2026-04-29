@@ -13,6 +13,7 @@ import { statSync } from 'fs';
 import { getNumber, checkCode, releaseNumber, getBalance, waitForCode } from './sms-api.js';
 import { solveCaptcha, getCaptchaBalance } from './captcha-solver.js';
 import { initAccountsDB, saveAccount, loadStats, listAccounts } from './accounts-db.js';
+import { runSnapshotGc } from './snapshot-gc.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -222,6 +223,25 @@ app.get('/api/snapshots/runtime/:macroId/:file', (req, res) => {
   const filePath = join(SNAPSHOTS_DIR, 'runtime', req.params.macroId, safe);
   if (!existsSync(filePath)) return res.status(404).send('Not found');
   res.sendFile(filePath);
+});
+
+// Run snapshot GC on demand. Body: { apply?: bool, runtimeMaxAgeDays?: number,
+// editorMaxAgeDays?: number, keepPerDir?: number }. Returns summary.
+app.post('/api/snapshots/gc', async (req, res) => {
+  const opts = req.body || {};
+  const apply = !!opts.apply;
+  const runtimeMaxAgeDays = parseFloat(opts.runtimeMaxAgeDays ?? 7);
+  const editorMaxAgeDays = parseFloat(opts.editorMaxAgeDays ?? 30);
+  const keepPerDir = parseInt(opts.keepPerDir ?? 200);
+
+  const summary = runSnapshotGc({
+    snapshotsDir: SNAPSHOTS_DIR,
+    apply,
+    runtimeMaxAgeDays,
+    editorMaxAgeDays,
+    keepPerDir,
+  });
+  res.json(summary);
 });
 
 // --- Snapshots ---
@@ -1157,4 +1177,25 @@ const HOST = process.env.HOST || '127.0.0.1';
 server.listen(PORT, HOST, () => {
   console.log(`🚀 Macro Recorder Server: http://${HOST}:${PORT}`);
   console.log(`📁 Data directory: ${DATA_ROOT}`);
+
+  // Boot-time snapshot GC. Default ON — runtime snapshots accumulate fast and
+  // the user almost never wants the old ones. Disable with SNAPSHOT_GC_ON_BOOT=0.
+  const gcOnBoot = process.env.SNAPSHOT_GC_ON_BOOT;
+  if (gcOnBoot === undefined || gcOnBoot === '1' || gcOnBoot === 'true') {
+    try {
+      const summary = runSnapshotGc({
+        snapshotsDir: SNAPSHOTS_DIR,
+        apply: true,
+        runtimeMaxAgeDays: parseFloat(process.env.RUNTIME_SNAPSHOT_MAX_AGE_DAYS || '7'),
+        editorMaxAgeDays: parseFloat(process.env.EDITOR_SNAPSHOT_MAX_AGE_DAYS || '30'),
+        keepPerDir: parseInt(process.env.SNAPSHOT_KEEP_PER_DIR || '200'),
+      });
+      if (summary.totalDeleted > 0) {
+        const mb = (summary.totalBytesFreed / 1024 / 1024).toFixed(1);
+        console.log(`🧹 Snapshot GC freed ~${mb} MB (${summary.totalDeleted} files)`);
+      }
+    } catch (e) {
+      console.warn('⚠ Snapshot GC at boot failed:', e.message);
+    }
+  }
 });

@@ -1,0 +1,16 @@
+{
+  "task": "snapshot-gc-browser-init",
+  "branch": "devin/1777472590-snapshot-gc-browser-init",
+  "acs": {
+    "AC1_module": "PASS",
+    "AC2_cli": "PASS",
+    "AC3_endpoint": "PASS",
+    "AC4_boot_hook": "PASS",
+    "AC5_browser_init_json": "PASS",
+    "AC6_start_url_override": "PASS",
+    "AC7_smoke": "PASS",
+    "AC8_manual_repro": "PASS"
+  },
+  "smokeTest": { "command": "SMOKE_PORT=3705 node scripts/smoke-test.mjs", "result": "PASS" },
+  "manualGcResult": "2 deleted, 3 kept (out of 5 with 2 files aged 14d)"
+}

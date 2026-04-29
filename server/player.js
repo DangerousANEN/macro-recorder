@@ -1682,7 +1682,8 @@ async function executeAtomicStep(p, step, path, wss, currentElement = null, exec
       }
 
       case 'browser-init': {
-        // Initialize (restart) browser context with chosen profile/proxy and navigate to macro startUrl
+        // Initialize (restart) browser context with chosen profile/proxy and navigate
+        // to either step.startUrl (explicit override) or the macro's start URL.
         const scope = step.scope || 'this'; // this|all
         let targetProfile = step.profileName ? resolveVars(step.profileName, step._tableRow || {}, vars) : (vars._current_profile || null);
         let proxy = step.proxy !== undefined ? resolveVars(step.proxy, step._tableRow || {}, vars) : (vars._current_proxy || null);
@@ -1692,7 +1693,11 @@ async function executeAtomicStep(p, step, path, wss, currentElement = null, exec
         // Treat empty strings as "not provided" so we don't accidentally break defaults
         if (targetProfile !== null && targetProfile !== undefined && String(targetProfile).trim() === '') targetProfile = null;
         if (proxy !== null && proxy !== undefined && String(proxy).trim() === '') proxy = null;
-        const gotoUrl = vars._macro_start_url || null;
+        // Step-level startUrl override takes precedence over the macro-level start URL.
+        const gotoUrl =
+          (step.startUrl ? resolveVars(step.startUrl, step._tableRow || {}, vars) : null) ||
+          vars._macro_start_url ||
+          null;
         const timeoutMs = parseInt(step.timeoutMs || '120000');
 
         broadcastStatus(wss, { type: 'browser-init', path, scope, profile: targetProfile, proxy: proxy ? String(proxy).substring(0, 40) : '' });

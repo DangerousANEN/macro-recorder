@@ -8,7 +8,8 @@
     "start": "node index.js",
     "dev": "node --watch index.js",
     "smoke": "node ../scripts/smoke-test.mjs",
-    "smoke:mcp": "node ../scripts/smoke-mcp.mjs"
+    "smoke:mcp": "node ../scripts/smoke-mcp.mjs",
+    "gc:snapshots": "node ../scripts/gc-snapshots.mjs"
   },
   "dependencies": {
     "archiver": "^7.0.1",
