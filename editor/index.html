@@ -12,11 +12,18 @@
     <aside class="sidebar">
       <div class="sidebar-header">
         <h1>🎬 Макросы</h1>
-        <button class="btn-icon" id="newMacroBtn" title="Новый макрос">＋</button>
+        <div style="display:flex;gap:4px">
+          <button class="btn-icon" id="importMacroBtn" title="Импорт макроса (JSON)">📂</button>
+          <button class="btn-icon" id="newMacroBtn" title="Новый макрос">＋</button>
+        </div>
+      </div>
+      <div class="sidebar-search">
+        <input type="text" id="macroSearchInput" class="settings-input" placeholder="🔍 Поиск по названию..." autocomplete="off">
       </div>
       <div class="macro-list" id="macroList">
         <div class="empty-state">Нет макросов</div>
       </div>
+      <input type="file" id="importMacroFile" accept="application/json,.json" style="display:none">
       <div id="runningMacrosPanel" style="display:none;border-top:1px solid var(--surface1);padding:8px;max-height:150px;overflow-y:auto">
         <div style="font-size:11px;color:var(--overlay);margin-bottom:4px;font-weight:700">🏃 Запущенные:</div>
         <div id="runningMacrosList"></div>
@@ -72,6 +79,7 @@
             <button class="btn btn-primary" id="runToBtn">▶ До выбранного</button>
             <button class="btn btn-warning" id="appendRecordBtn">🔴 Дозапись</button>
             <button class="btn btn-accent" id="addStepBtn">＋ Добавить</button>
+            <button class="btn btn-secondary" id="exportMacroBtn" title="Скачать макрос как JSON">💾</button>
             <button class="btn btn-danger" id="deleteMacroBtn">🗑</button>
           </div>
         </div>
@@ -562,6 +570,14 @@
             <button class="action-card card-service" data-new-action="set-variable"><span class="ac-icon">📝</span><span class="ac-name">Переменная</span><span class="ac-desc">Записать / дополнить значение</span></button>
           </div>
         </div>
+        <div class="action-category">
+          <div class="category-title">🧪 Проверки и данные</div>
+          <div class="action-cards">
+            <button class="action-card" data-new-action="assert"><span class="ac-icon">✅</span><span class="ac-name">Проверка (assert)</span><span class="ac-desc">Падает если условие ложно</span></button>
+            <button class="action-card" data-new-action="screenshot"><span class="ac-icon">📸</span><span class="ac-name">Скриншот</span><span class="ac-desc">PNG страницы → data/snapshots/runtime/</span></button>
+            <button class="action-card" data-new-action="extract"><span class="ac-icon">🔍</span><span class="ac-name">Извлечь (regex)</span><span class="ac-desc">Группа из текста → переменная</span></button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -949,6 +965,28 @@
             <div class="form-group" style="flex:1"><label>Колонка</label><input type="text" id="cfgReadColumnName" class="settings-input" placeholder="email"></div>
           </div>
         </div>
+        <!-- Assert -->
+        <div class="config-section" id="cfgAssertSection">
+          <div class="form-group"><label>Сообщение при провале (опц.)</label><input type="text" id="cfgAssertMessage" class="settings-input" placeholder="Например: Ожидалось не пусто, но получили пусто"></div>
+          <div class="config-var-hint">💡 Переменная / оператор / значение задаются выше в общей секции «Условие». Если условие ложно — макрос упадёт с этим сообщением.</div>
+        </div>
+        <!-- Screenshot -->
+        <div class="config-section" id="cfgScreenshotSection">
+          <div class="form-group"><label>Префикс файла / переменная (опц.)</label><input type="text" id="cfgScreenshotPrefix" class="settings-input" placeholder="например: error, before-click, {{step_name}}"></div>
+          <label class="toggle-label" style="margin-top:8px"><input type="checkbox" id="cfgScreenshotFullPage"> Скриншот всей страницы (full page)</label>
+          <div class="config-var-hint">📁 Сохраняется в <code>data/snapshots/runtime/&lt;macroId&gt;/&lt;prefix&gt;-&lt;ts&gt;.png</code>. Если префикс — имя переменной, путь к файлу записывается в неё.</div>
+        </div>
+        <!-- Extract (regex) -->
+        <div class="config-section" id="cfgExtractSection">
+          <div class="form-group"><label>Источник (текст или {{переменная}})</label><input type="text" id="cfgExtractSource" class="settings-input" placeholder="{{page_text}}"></div>
+          <div class="form-group"><label>Регулярное выражение</label><input type="text" id="cfgExtractPattern" class="settings-input" placeholder="например: id=(\d+)"></div>
+          <div class="form-row">
+            <div class="form-group" style="flex:1"><label>Флаги</label><input type="text" id="cfgExtractFlags" class="settings-input" placeholder="i" value="i"></div>
+            <div class="form-group" style="flex:1"><label>№ группы (0=весь матч)</label><input type="number" id="cfgExtractGroup" class="settings-input" value="1" min="0"></div>
+            <div class="form-group" style="flex:1"><label>Сохранить в</label><input type="text" id="cfgExtractSaveAs" class="settings-input" placeholder="extracted_id"></div>
+          </div>
+          <div class="config-var-hint">💡 Если шаблон не сработал — переменная получит пустую строку.</div>
+        </div>
       </div>
       <div class="modal-buttons">
         <button class="btn btn-secondary" id="cancelStepConfig2">Отмена</button>
@@ -1079,6 +1117,7 @@
     <div class="ctx-divider"></div>
     <button class="ctx-item" data-ctx="edit"><span class="ctx-icon">✏️</span> Редактировать</button>
     <button class="ctx-item" data-ctx="rename"><span class="ctx-icon">🏷️</span> Переименовать</button>
+    <button class="ctx-item" data-ctx="duplicate"><span class="ctx-icon">📑</span> Дублировать <span style="color:var(--overlay);font-size:11px">Ctrl+D</span></button>
     <button class="ctx-item ctx-danger" data-ctx="delete"><span class="ctx-icon">🗑</span> Удалить</button>
   </div>
 

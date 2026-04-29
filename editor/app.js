@@ -16,7 +16,8 @@ const ACTION_ICONS = {
   // Autoreg blocks
   'get-sms-number': '📱', 'wait-sms-code': '📞', 'solve-captcha': '🧩',
   'save-account': '📋', 'check-blocked': '🔍', 'human-delay': '⏱️', 'release-number': '📧',
-  'browser-init': '🌐', 'switch-profile': '🧭'
+  'browser-init': '🌐', 'switch-profile': '🧭',
+  'assert': '✅', 'screenshot': '📸', 'extract': '🔍'
 };
 const ACTION_NAMES = {
   click: 'Клик', type: 'Ввод текста', read: 'Чтение → переменная', wait: 'Ожидание',
@@ -41,7 +42,10 @@ const ACTION_NAMES = {
   'check-blocked': 'Проверить блокировку', 'human-delay': 'Человеческая пауза',
   'release-number': 'Освободить номер',
   'browser-init': 'Инициализировать браузер',
-  'switch-profile': 'Сменить профиль'
+  'switch-profile': 'Сменить профиль',
+  'assert': 'Проверка (assert)',
+  'screenshot': 'Скриншот',
+  'extract': 'Извлечь (regex)'
 };
 
 // AC6/AC7: Block definitions loaded from server
@@ -195,6 +199,34 @@ function insertStepAt(steps, parentPath, insertIdx, step) {
     const idx = Math.min(insertIdx, arr.length);
     arr.splice(idx, 0, step);
   }
+}
+
+// Deep-clone a step and regenerate any nested ids so we don't get duplicates.
+function cloneStepFresh(step) {
+  const copy = JSON.parse(JSON.stringify(step));
+  const regen = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (node.id) node.id = `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    for (const key of ['children', 'elseChildren', 'exceptChildren', 'finallyChildren']) {
+      if (Array.isArray(node[key])) node[key].forEach(regen);
+    }
+  };
+  regen(copy);
+  return copy;
+}
+
+// Duplicate a step (or block) and insert the clone right after the original.
+function duplicateStepAtPath(path) {
+  if (!currentMacro || !path) return null;
+  const orig = getStepByPath(currentMacro.steps, path);
+  if (!orig) return null;
+  const parts = String(path).split('.');
+  const idx = parseInt(parts[parts.length - 1]);
+  const parentPath = parts.slice(0, -1).join('.');
+  const copy = cloneStepFresh(orig);
+  insertStepAt(currentMacro.steps, parentPath, idx + 1, copy);
+  const newPath = parentPath ? `${parentPath}.${idx + 1}` : `${idx + 1}`;
+  return newPath;
 }
 
 // Safely move a step: handles index shifts when src and dst are in the same array
@@ -425,12 +457,22 @@ function showView(view) {
 }
 
 // ==================== Render ====================
+let macroSearchQuery = '';
+
 function renderMacroList() {
   if (macros.length === 0) {
     macroList.innerHTML = '<div class="empty-state">Нет макросов</div>';
     return;
   }
-  macroList.innerHTML = macros.map(m => `
+  const q = macroSearchQuery.trim().toLowerCase();
+  const filtered = q
+    ? macros.filter(m => (m.name || '').toLowerCase().includes(q) || (currentMacro && currentMacro.id === m.id))
+    : macros;
+  if (filtered.length === 0) {
+    macroList.innerHTML = '<div class="empty-state">Нет совпадений</div>';
+    return;
+  }
+  macroList.innerHTML = filtered.map(m => `
     <div class="macro-item ${currentMacro?.id === m.id ? 'active' : ''}" data-id="${m.id}">
       <div class="macro-item-name">${esc(m.name)}</div>
       <div class="macro-item-info">${m.stepsCount} шагов</div>
@@ -1408,10 +1450,24 @@ function openStepConfigForEdit(path) {
       document.getElementById('cfgLoopWhileDelayMax').value = step.delayMax || 3;
     }
   }
-  if (step.action === 'if') {
+  if (step.action === 'if' || step.action === 'assert') {
     document.getElementById('cfgCondVar').value = step.conditionVar || '';
     document.getElementById('cfgOperator').value = step.operator || 'not-empty';
     document.getElementById('cfgCompareValue').value = step.compareValue || '';
+  }
+  if (step.action === 'assert') {
+    document.getElementById('cfgAssertMessage').value = step.message || '';
+  }
+  if (step.action === 'screenshot') {
+    document.getElementById('cfgScreenshotPrefix').value = step.saveAs || '';
+    document.getElementById('cfgScreenshotFullPage').checked = !!step.fullPage;
+  }
+  if (step.action === 'extract') {
+    document.getElementById('cfgExtractSource').value = step.source || '';
+    document.getElementById('cfgExtractPattern').value = step.pattern || '';
+    document.getElementById('cfgExtractFlags').value = step.flags || 'i';
+    document.getElementById('cfgExtractGroup').value = step.group ?? 1;
+    document.getElementById('cfgExtractSaveAs').value = step.saveAs || '';
   }
   if (step.action === 'try-except') {
     document.getElementById('cfgOnError').value = step.onError || 'continue';
@@ -1620,6 +1676,20 @@ function showConfigFields(action) {
   }
   if (action === 'proxy-rotate') {
     document.getElementById('cfgProxyRotateSection').classList.add('visible');
+  }
+
+  // Assert / Screenshot / Extract config sections
+  if (action === 'assert') {
+    // Reuse the if-block condition section for varName/operator/compareValue, plus an extra
+    // section with the assert message.
+    document.getElementById('cfgIfSection').classList.add('visible');
+    document.getElementById('cfgAssertSection').classList.add('visible');
+  }
+  if (action === 'screenshot') {
+    document.getElementById('cfgScreenshotSection').classList.add('visible');
+  }
+  if (action === 'extract') {
+    document.getElementById('cfgExtractSection').classList.add('visible');
   }
 }
 
@@ -1857,10 +1927,24 @@ document.getElementById('confirmStepConfig').addEventListener('click', () => {
       delete step.count;
     }
   }
-  if (action === 'if') {
+  if (action === 'if' || action === 'assert') {
     step.conditionVar = document.getElementById('cfgCondVar').value;
     step.operator = document.getElementById('cfgOperator').value;
     step.compareValue = document.getElementById('cfgCompareValue').value;
+  }
+  if (action === 'assert') {
+    step.message = document.getElementById('cfgAssertMessage').value || '';
+  }
+  if (action === 'screenshot') {
+    step.saveAs = document.getElementById('cfgScreenshotPrefix').value || '';
+    step.fullPage = document.getElementById('cfgScreenshotFullPage').checked;
+  }
+  if (action === 'extract') {
+    step.source = document.getElementById('cfgExtractSource').value || '';
+    step.pattern = document.getElementById('cfgExtractPattern').value || '';
+    step.flags = document.getElementById('cfgExtractFlags').value || 'i';
+    step.group = document.getElementById('cfgExtractGroup').value || '1';
+    step.saveAs = document.getElementById('cfgExtractSaveAs').value || '';
   }
   if (action === 'try-except') {
     step.onError = document.getElementById('cfgOnError').value || 'continue';
@@ -2339,6 +2423,53 @@ document.getElementById('newMacroBtn').addEventListener('click', createMacro);
 document.getElementById('addStepBtn').addEventListener('click', () => openAddStepModal(''));
 document.getElementById('addStepEmptyBtn')?.addEventListener('click', () => openAddStepModal(''));
 document.getElementById('deleteMacroBtn').addEventListener('click', deleteMacro);
+
+// Sidebar search filters macro list as the user types.
+document.getElementById('macroSearchInput')?.addEventListener('input', (e) => {
+  macroSearchQuery = e.target.value || '';
+  renderMacroList();
+});
+
+// Export macro: open the export endpoint as a download.
+document.getElementById('exportMacroBtn')?.addEventListener('click', () => {
+  if (!currentMacro) return;
+  const a = document.createElement('a');
+  a.href = `${API}/macros/${currentMacro.id}/export`;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+});
+
+// Import macro: hidden file input, parse JSON, POST to import endpoint, then refresh and select.
+document.getElementById('importMacroBtn')?.addEventListener('click', () => {
+  document.getElementById('importMacroFile').click();
+});
+document.getElementById('importMacroFile')?.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const res = await fetch(`${API}/macros/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert('Импорт не удался: ' + (err.error || res.status));
+      return;
+    }
+    const { id } = await res.json();
+    await fetchMacros();
+    if (id) selectMacro(id);
+  } catch (err) {
+    alert('Не удалось распарсить JSON: ' + err.message);
+  } finally {
+    e.target.value = '';
+  }
+});
 document.getElementById('runAllBtn').addEventListener('click', openRunModal);
 document.getElementById('runToBtn').addEventListener('click', () => {
   if (selectedPath) {
@@ -3144,6 +3275,14 @@ contextMenu.addEventListener('click', async e => {
         saveMacro(); renderSteps();
       }
     }
+  } else if (action === 'duplicate') {
+    const newPath = duplicateStepAtPath(ctxTargetPath);
+    if (newPath) {
+      selectedPath = newPath;
+      multiSelectedPaths.clear();
+      saveMacro();
+      renderSteps();
+    }
   } else if (action === 'delete') {
     deleteSelected();
   }
@@ -3228,6 +3367,17 @@ document.addEventListener('keydown', e => {
   } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
     e.preventDefault();
     pasteAfterSelected();
+  } else if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+    if (selectedPath) {
+      e.preventDefault();
+      const newPath = duplicateStepAtPath(selectedPath);
+      if (newPath) {
+        selectedPath = newPath;
+        multiSelectedPaths.clear();
+        saveMacro();
+        renderSteps();
+      }
+    }
   } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
     e.preventDefault();
     // Select all top-level steps

@@ -183,6 +183,47 @@ app.delete('/api/macros/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// Export a macro as a downloadable JSON file (browser triggers Save As).
+app.get('/api/macros/:id/export', (req, res) => {
+  const m = loadMacro(req.params.id);
+  if (!m) return res.status(404).json({ error: 'Not found' });
+  const safeName = (m.name || 'macro').replace(/[^\w.\-]+/g, '_').slice(0, 80);
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${safeName}.macro.json"`);
+  res.send(JSON.stringify(m, null, 2));
+});
+
+// Import a macro from a JSON body. Generates a new id when missing or already taken.
+app.post('/api/macros/import', (req, res) => {
+  const incoming = req.body || {};
+  if (!Array.isArray(incoming.steps)) {
+    return res.status(400).json({ error: 'Invalid macro: missing steps array' });
+  }
+  const desiredId = (typeof incoming.id === 'string' && incoming.id) ? incoming.id : null;
+  let id = desiredId;
+  if (!id || existsSync(macroPath(id))) id = uuid();
+  const macro = {
+    ...incoming,
+    id,
+    name: incoming.name || 'Импорт',
+    steps: incoming.steps,
+    startUrl: incoming.startUrl || '',
+    createdAt: incoming.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    importedAt: new Date().toISOString(),
+  };
+  saveMacro(macro);
+  res.status(201).json({ id: macro.id, name: macro.name });
+});
+
+// Serve runtime screenshots produced by the `screenshot` step.
+app.get('/api/snapshots/runtime/:macroId/:file', (req, res) => {
+  const safe = req.params.file.replace(/[^\w.\-]+/g, '_');
+  const filePath = join(SNAPSHOTS_DIR, 'runtime', req.params.macroId, safe);
+  if (!existsSync(filePath)) return res.status(404).send('Not found');
+  res.sendFile(filePath);
+});
+
 // --- Snapshots ---
 app.post('/api/macros/:id/snapshots/:idx', express.text({ limit: '2mb', type: '*/*' }), (req, res) => {
   const snapDir = join(SNAPSHOTS_DIR, req.params.id);

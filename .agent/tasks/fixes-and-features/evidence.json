@@ -1,0 +1,40 @@
+{
+  "task": "fixes-and-features",
+  "branch": "devin/1777470057-fixes-and-features",
+  "acs": {
+    "AC1": "PASS",
+    "AC2": "DEFERRED",
+    "AC3": "PASS",
+    "AC4": "PASS",
+    "AC5": "PASS",
+    "AC6": "PASS",
+    "AC7": "PASS",
+    "AC8": "PASS",
+    "AC9": "PASS",
+    "AC10": "PASS"
+  },
+  "smokeTest": {
+    "command": "SMOKE_PORT=3701 node scripts/smoke-test.mjs",
+    "result": "PASS"
+  },
+  "newFiles": [
+    "data/blocks/assert.json",
+    "data/blocks/screenshot.json",
+    "data/blocks/extract.json",
+    "data/blocks/browser-init.json",
+    "data/blocks/switch-profile.json",
+    "data/blocks/debug-dump.json",
+    "scripts/smoke-test.mjs",
+    ".agent/tasks/fixes-and-features/spec.md",
+    ".agent/tasks/fixes-and-features/evidence.md",
+    ".agent/tasks/fixes-and-features/evidence.json"
+  ],
+  "modifiedFiles": [
+    "server/player.js",
+    "server/index.js",
+    "server/package.json",
+    "editor/index.html",
+    "editor/app.js",
+    "editor/style.css"
+  ]
+}

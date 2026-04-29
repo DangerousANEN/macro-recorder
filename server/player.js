@@ -48,14 +48,17 @@ const __dirname = dirname(__filename);
 const DATA_ROOT = join(__dirname, '..', 'data');
 const TEMP_DIR = join(DATA_ROOT, '.tmp');
 const PYTHON_DIR = join(DATA_ROOT, 'python');
+const RUNTIME_SNAPSHOTS_DIR = join(DATA_ROOT, 'snapshots', 'runtime');
 import { mkdirSync } from 'fs';
 mkdirSync(TEMP_DIR, { recursive: true });
+mkdirSync(RUNTIME_SNAPSHOTS_DIR, { recursive: true });
 
 let browser = null;
 let context = null;
 let page = null;
 let runtimeVars = {};
 let stopRequested = false;
+let currentMacroId = null;
 
 // --- Execution diagnostics (best-effort) ---
 let lastStepPath = null;
@@ -1803,12 +1806,63 @@ async function executeAtomicStep(p, step, path, wss, currentElement = null, exec
         break;
       }
 
+      case 'assert': {
+        // Fail-fast condition check: if condition is true, succeed; otherwise throw.
+        const ok = evaluateCondition(step, step._tableRow || {}, vars);
+        if (!ok) {
+          const msg = resolveVars(step.message || '', step._tableRow || {}, vars)
+            || `Assert failed: ${step.conditionVar || ''} ${step.operator || 'not-empty'} ${step.compareValue || ''}`;
+          throw new Error(msg);
+        }
+        broadcastStatus(wss, { type: 'assert-passed', path, conditionVar: step.conditionVar, operator: step.operator });
+        break;
+      }
+
+      case 'screenshot': {
+        // Take a runtime PNG screenshot of the current page (or full page).
+        const macroId = currentMacroId ? String(currentMacroId) : 'adhoc';
+        const macroDir = join(RUNTIME_SNAPSHOTS_DIR, macroId);
+        mkdirSync(macroDir, { recursive: true });
+        const prefix = (resolveVars(step.saveAs || '', step._tableRow || {}, vars) || 'shot').replace(/[^\w.\-]+/g, '_');
+        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `${prefix}-${ts}.png`;
+        const fullPath = join(macroDir, filename);
+        const fullPage = !!step.fullPage;
+        await p.screenshot({ path: fullPath, fullPage });
+        const relPath = `runtime/${macroId}/${filename}`;
+        broadcastStatus(wss, { type: 'screenshot-saved', path, file: relPath, fullPage });
+        if (step.saveAs) vars[step.saveAs] = relPath;
+        break;
+      }
+
+      case 'extract': {
+        // Pull a regex group from a source (variable reference or literal) into a variable.
+        const sourceText = resolveVars(step.source || '', step._tableRow || {}, vars);
+        const pattern = step.pattern || '';
+        const flags = step.flags || 'i';
+        const groupIdx = parseInt(step.group ?? '1');
+        const target = step.saveAs || '_extracted';
+        let result = '';
+        if (pattern) {
+          try {
+            const re = new RegExp(pattern, flags);
+            const m = re.exec(sourceText);
+            if (m) result = (groupIdx === 0 ? m[0] : (m[groupIdx] ?? '')) || '';
+          } catch (regexErr) {
+            throw new Error(`extract: bad regex "${pattern}" (${regexErr.message})`);
+          }
+        }
+        vars[target] = result;
+        broadcastStatus(wss, { type: 'var-saved', path, varName: target, value: result });
+        break;
+      }
+
       case 'break':
-        broadcastStatus(wss, { type: 'step-completed', path, success: true });
+        // Don't broadcast step-completed here — break/continue are control flow,
+        // not normal completable steps. The catch block below also skips them.
         throw new BreakError();
 
       case 'continue':
-        broadcastStatus(wss, { type: 'step-completed', path, success: true });
         throw new ContinueError();
 
       default:
@@ -1819,6 +1873,8 @@ async function executeAtomicStep(p, step, path, wss, currentElement = null, exec
     broadcastStatus(wss, { type: 'step-completed', path, success: true });
     return { success: true, path };
   } catch (e) {
+    // Control-flow exceptions (break/continue) are not failures — don't broadcast as such.
+    if (e instanceof BreakError || e instanceof ContinueError) throw e;
     broadcastStatus(wss, { type: 'step-completed', path, success: false, error: e.message });
     throw e;
   }
@@ -2338,6 +2394,7 @@ export async function runMacro(macro, wss, profileName = null, options = {}) {
   runtimeVars = {};
   // Important: previous Stop/forced close should not block new runs
   stopRequested = false;
+  currentMacroId = macro?.id || null;
 
   // AC8: Load persistent variables at start
   const persistentVars = loadPersistentVars();
@@ -2478,6 +2535,7 @@ export async function runUpTo(macro, upToIndex, wss, profileName = null) {
 export async function runMacroLoop(macro, wss, { times = 1, tableName = '', delayMin = 3, delayMax = 10, profileName = null, fingerprintPerIteration = false, fingerprintSafeMode = true } = {}) {
   // If first step is browser-init, delay browser creation so we don't open an unproxied window.
   let p = null;
+  currentMacroId = macro?.id || null;
   const firstAction = macro.steps?.[0]?.action;
   if (firstAction !== 'browser-init') {
     p = await ensureBrowser(profileName);

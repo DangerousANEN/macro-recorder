@@ -1,0 +1,1 @@
+{"name":"Проверка (assert)","icon":"✅","color":"#a6e3a1","type":"atomic","fields":["conditionVar","operator","compareValue","message"]}
