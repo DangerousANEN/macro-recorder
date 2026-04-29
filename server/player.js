@@ -803,13 +803,23 @@ async function smartClick(p, step, selector, timeout, wss, path) {
     attempts.push({ kind: 'placeholder', value: step.placeholder.trim() });
   }
 
+  // 4b) User-supplied fallback selectors. Each entry can be either a plain
+  // CSS string or an object {kind: 'css'|'xpath'|'placeholder'|'role', value, name?}.
+  if (Array.isArray(step?.fallbackSelectors)) {
+    for (const fb of step.fallbackSelectors) {
+      if (!fb) continue;
+      if (typeof fb === 'string') attempts.push({ kind: 'css', value: fb });
+      else if (typeof fb === 'object' && fb.kind && fb.value) attempts.push({ ...fb });
+    }
+  }
+
   // 5) Heuristics for Telegram Web search
   if ((selector || '').includes('telegram-search-input') || (step?.cssSelector || '').includes('telegram-search-input')) {
     // Legacy /a/ UI
     attempts.push({ kind: 'placeholder', value: 'Search' });
     attempts.push({ kind: 'role', value: 'textbox', name: 'Search' });
-
-    // New /k/ UI often doesn't have the old id; try broader search-field patterns
+    // New /k/ UI doesn't have the legacy id; cover the typical search fields.
+    attempts.push({ kind: 'css', value: '.input-search-input, input.input-search-input' });
     attempts.push({ kind: 'css', value: 'input[type="search"], input[placeholder*="Search" i], input[aria-label*="Search" i], [contenteditable="true"][role="textbox"]' });
   }
 
@@ -878,12 +888,21 @@ async function smartFill(p, step, selector, value, timeout, wss, path) {
   if (step?.xpath && typeof step.xpath === 'string' && step.xpath.trim()) attempts.push({ kind: 'xpath', value: step.xpath.trim() });
   if (step?.placeholder && typeof step.placeholder === 'string' && step.placeholder.trim()) attempts.push({ kind: 'placeholder', value: step.placeholder.trim() });
 
+  // User-supplied fallback selectors (mirrors smartClick).
+  if (Array.isArray(step?.fallbackSelectors)) {
+    for (const fb of step.fallbackSelectors) {
+      if (!fb) continue;
+      if (typeof fb === 'string') attempts.push({ kind: 'css', value: fb });
+      else if (typeof fb === 'object' && fb.kind && fb.value) attempts.push({ ...fb });
+    }
+  }
+
   if ((selector || '').includes('telegram-search-input') || (step?.cssSelector || '').includes('telegram-search-input')) {
     // Legacy /a/ UI
     attempts.push({ kind: 'placeholder', value: 'Search' });
     attempts.push({ kind: 'role', value: 'textbox', name: 'Search' });
-
-    // New /k/ UI often doesn't have the old id; try broader search-field patterns
+    // New /k/ UI doesn't have the legacy id; cover typical search field patterns.
+    attempts.push({ kind: 'css', value: '.input-search-input, input.input-search-input' });
     attempts.push({ kind: 'css', value: 'input[type="search"], input[placeholder*="Search" i], input[aria-label*="Search" i], [contenteditable="true"][role="textbox"]' });
   }
 

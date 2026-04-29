@@ -22,6 +22,8 @@ data/readed.csv
 
 # Macro recordings (user content) — keep .gitkeep
 data/macros/*.json
+# Example seed macros checked into the repo
+!data/macros/tg3-smoke-001.json
 
 # OS / editor
 .DS_Store
