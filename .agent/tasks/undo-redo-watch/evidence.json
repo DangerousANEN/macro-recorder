@@ -1,0 +1,17 @@
+{
+  "task": "undo-redo-watch",
+  "branch": "devin/1777472340-undo-redo-watch",
+  "acs": {
+    "AC1_redo_stack": "PASS",
+    "AC2_keyboard_shortcuts": "PASS",
+    "AC3_toolbar_buttons": "PASS",
+    "AC4_watch_panel": "PASS",
+    "AC5_evaluation": "PASS",
+    "AC6_persistence": "PASS",
+    "AC7_smoke": "PASS"
+  },
+  "smokeTest": {
+    "command": "SMOKE_PORT=3704 node scripts/smoke-test.mjs",
+    "result": "PASS"
+  }
+}

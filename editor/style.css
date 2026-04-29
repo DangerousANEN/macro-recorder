@@ -928,6 +928,22 @@ body {
   color: var(--overlay);
   font-size: 12px;
 }
+.debug-watch-section {
+  border-top: 1px solid var(--surface3);
+  padding: 8px 0 0;
+  margin-top: 8px;
+}
+.debug-watch-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 12px; font-size: 12px; font-weight: 600; color: var(--subtext);
+}
+.debug-watch-list { padding: 0; }
+.debug-watch-row { cursor: pointer; }
+.debug-watch-row:hover { background: var(--surface2); }
+.debug-watch-remove {
+  width: 22px; height: 22px; padding: 0; font-size: 14px;
+  margin-left: auto;
+}
 
 /* Debug Controls */
 .debug-controls {

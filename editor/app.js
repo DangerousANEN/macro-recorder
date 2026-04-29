@@ -118,22 +118,41 @@ let multiSelectedPaths = new Set();
 let lastClickedPath = null;
 let clipboard = []; // Array of step copies
 
-// Undo stack
-let undoStack = []; // Array of {steps: deepCopy} snapshots
+// Undo / Redo stacks. Each entry is a deep-copied snapshot of `currentMacro.steps`.
+let undoStack = [];
+let redoStack = [];
 const MAX_UNDO = 50;
 
 function pushUndo() {
   if (!currentMacro) return;
   undoStack.push(JSON.parse(JSON.stringify(currentMacro.steps)));
   if (undoStack.length > MAX_UNDO) undoStack.shift();
+  // Any new mutating action invalidates the redo stack — that's the standard
+  // editor undo/redo contract (Ctrl+Z then editing = no more Ctrl+Y).
+  redoStack = [];
 }
 
 function popUndo() {
   if (undoStack.length === 0 || !currentMacro) return false;
+  // Save the *current* state to redo stack before reverting.
+  redoStack.push(JSON.parse(JSON.stringify(currentMacro.steps)));
+  if (redoStack.length > MAX_UNDO) redoStack.shift();
   currentMacro.steps = undoStack.pop();
   saveMacro();
   renderSteps();
   logToConsole('SYS', '↩️ Отменено', 'info');
+  return true;
+}
+
+function popRedo() {
+  if (redoStack.length === 0 || !currentMacro) return false;
+  // Save the *current* state back to undo stack before re-applying.
+  undoStack.push(JSON.parse(JSON.stringify(currentMacro.steps)));
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  currentMacro.steps = redoStack.pop();
+  saveMacro();
+  renderSteps();
+  logToConsole('SYS', '↪️ Повторено', 'info');
   return true;
 }
 
@@ -2492,6 +2511,8 @@ document.getElementById('newMacroBtn').addEventListener('click', createMacro);
 document.getElementById('addStepBtn').addEventListener('click', () => openAddStepModal(''));
 document.getElementById('addStepEmptyBtn')?.addEventListener('click', () => openAddStepModal(''));
 document.getElementById('deleteMacroBtn').addEventListener('click', deleteMacro);
+document.getElementById('undoBtn')?.addEventListener('click', popUndo);
+document.getElementById('redoBtn')?.addEventListener('click', popRedo);
 
 // Sidebar search filters macro list as the user types.
 document.getElementById('macroSearchInput')?.addEventListener('input', (e) => {
@@ -2691,21 +2712,96 @@ function renderDebugVariables() {
 
   if (entries.length === 0) {
     list.innerHTML = '<div class="debug-vars-empty">Нет переменных</div>';
-    return;
+  } else {
+    list.innerHTML = entries.map(([name, value]) => {
+      const type = typeof value;
+      const displayType = type === 'string' ? 'str' : type === 'number' ? 'num' : type === 'boolean' ? 'bool' : type;
+      const displayValue = typeof value === 'string' ? `"${value.substring(0, 100)}"` : JSON.stringify(value);
+      const changed = debugPreviousVariables[name] !== undefined && JSON.stringify(debugPreviousVariables[name]) !== JSON.stringify(value);
+      return `<div class="debug-var-row ${changed ? 'debug-var-changed' : ''}">
+        <span class="debug-var-name">${esc(name)}</span>
+        <span class="debug-var-type">${displayType}</span>
+        <span class="debug-var-value">${esc(displayValue)}</span>
+      </div>`;
+    }).join('');
   }
 
-  list.innerHTML = entries.map(([name, value]) => {
-    const type = typeof value;
-    const displayType = type === 'string' ? 'str' : type === 'number' ? 'num' : type === 'boolean' ? 'bool' : type;
-    const displayValue = typeof value === 'string' ? `"${value.substring(0, 100)}"` : JSON.stringify(value);
-    const changed = debugPreviousVariables[name] !== undefined && JSON.stringify(debugPreviousVariables[name]) !== JSON.stringify(value);
-    return `<div class="debug-var-row ${changed ? 'debug-var-changed' : ''}">
-      <span class="debug-var-name">${esc(name)}</span>
-      <span class="debug-var-type">${displayType}</span>
-      <span class="debug-var-value">${esc(displayValue)}</span>
+  renderWatchExpressions();
+}
+
+// ===== Watch expressions =====
+// User-defined expressions evaluated against the current debug variables. The expression
+// is interpreted as either a plain variable name (`bot_name`) or a {{template}} string
+// expanded with `resolveVarsTemplate`. Expressions live in localStorage so they survive
+// reloads.
+const WATCH_KEY = 'macroRecorder.watchExpressions';
+let watchExpressions = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]');
+
+function persistWatchExpressions() {
+  localStorage.setItem(WATCH_KEY, JSON.stringify(watchExpressions));
+}
+
+function evaluateWatchExpression(expr, vars) {
+  if (!expr) return '';
+  // {{template}} → expand with current vars; otherwise treat as bare var name.
+  if (expr.includes('{{')) {
+    return expr.replace(/\{\{([^}]+)\}\}/g, (_, name) => {
+      const v = vars[name.trim()];
+      return v === undefined ? `<undefined ${name.trim()}>` : (typeof v === 'string' ? v : JSON.stringify(v));
+    });
+  }
+  const v = vars[expr];
+  if (v === undefined) return `<undefined ${expr}>`;
+  return typeof v === 'string' ? v : JSON.stringify(v);
+}
+
+function renderWatchExpressions() {
+  const list = document.getElementById('debugWatchList');
+  if (!list) return;
+  if (watchExpressions.length === 0) {
+    list.innerHTML = '<div class="debug-vars-empty">Нет выражений. Кликните «＋» чтобы добавить.</div>';
+    return;
+  }
+  const vars = debugVariables || {};
+  list.innerHTML = watchExpressions.map((expr, i) => {
+    const value = evaluateWatchExpression(expr, vars);
+    return `<div class="debug-var-row debug-watch-row" data-watch-idx="${i}">
+      <span class="debug-var-name" title="Кликните чтобы редактировать">${esc(expr)}</span>
+      <span class="debug-var-value">${esc(String(value).slice(0, 200))}</span>
+      <button class="btn-icon debug-watch-remove" data-watch-remove="${i}" title="Удалить">×</button>
     </div>`;
   }).join('');
 }
+
+document.getElementById('addWatchBtn')?.addEventListener('click', () => {
+  const expr = prompt('Выражение для отслеживания:\n• имя переменной (например bot_name)\n• {{шаблон}} с подстановкой переменных');
+  if (expr && expr.trim()) {
+    watchExpressions.push(expr.trim());
+    persistWatchExpressions();
+    renderWatchExpressions();
+  }
+});
+
+document.getElementById('debugWatchList')?.addEventListener('click', (e) => {
+  const removeBtn = e.target.closest('[data-watch-remove]');
+  if (removeBtn) {
+    const idx = parseInt(removeBtn.dataset.watchRemove);
+    watchExpressions.splice(idx, 1);
+    persistWatchExpressions();
+    renderWatchExpressions();
+    return;
+  }
+  const row = e.target.closest('.debug-watch-row');
+  if (row && !e.target.closest('[data-watch-remove]')) {
+    const idx = parseInt(row.dataset.watchIdx);
+    const next = prompt('Изменить выражение:', watchExpressions[idx]);
+    if (next !== null && next.trim()) {
+      watchExpressions[idx] = next.trim();
+      persistWatchExpressions();
+      renderWatchExpressions();
+    }
+  }
+});
 
 // Debug control buttons
 document.getElementById('debugStepOver').addEventListener('click', () => sendDebugCommand('step-over'));
@@ -3427,7 +3523,15 @@ document.addEventListener('keydown', e => {
   if (document.querySelector('.modal-overlay[style*="flex"]')) return;
   if (!currentMacro) return;
 
-  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+    // Ctrl+Shift+Z = redo
+    e.preventDefault();
+    popRedo();
+  } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+    // Ctrl+Y = redo (Windows-style)
+    e.preventDefault();
+    popRedo();
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
     e.preventDefault();
     popUndo();
   } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
