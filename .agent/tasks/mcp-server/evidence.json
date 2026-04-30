@@ -1,0 +1,22 @@
+{
+  "task": "mcp-server",
+  "branch": "devin/1777472130-mcp-server",
+  "acs": {
+    "AC1_package": "PASS",
+    "AC2_list_macros": "PASS",
+    "AC3_get_macro": "PASS",
+    "AC4_run_macro": "PASS",
+    "AC5_stop_macro": "PASS",
+    "AC6_list_running": "PASS",
+    "AC7_list_blocks": "PASS",
+    "AC8_env_url": "PASS",
+    "AC9_readme": "PASS",
+    "AC10_smoke": "PASS"
+  },
+  "smokeTest": {
+    "command": "node scripts/smoke-mcp.mjs",
+    "checksTotal": 13,
+    "checksPass": 13,
+    "result": "PASS"
+  }
+}
