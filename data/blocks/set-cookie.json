@@ -1,0 +1,1 @@
+{"name":"Установить cookie","icon":"🍪","color":"#f9e2af","type":"atomic","fields":["cookieName","cookieValue","cookieDomain","cookiePath","cookieExpires"]}

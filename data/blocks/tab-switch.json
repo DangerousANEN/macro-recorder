@@ -1,0 +1,1 @@
+{"name":"Переключить вкладку","icon":"🗂","color":"#74c7ec","type":"atomic","fields":["tabIndex","tabUrlContains"]}

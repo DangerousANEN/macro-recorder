@@ -1,0 +1,22 @@
+{
+  "task": "extra-blocks",
+  "branch": "devin/1777471807-extra-blocks",
+  "acs": {
+    "AC1_delay": "PASS",
+    "AC2_set-cookie": "PASS",
+    "AC3_clear-cookies": "PASS",
+    "AC4_tab-open": "PASS",
+    "AC5_tab-switch": "PASS",
+    "AC6_tab-close": "PASS",
+    "AC7_hover": "PASS",
+    "AC8_eval-js": "PASS",
+    "AC9_editor_wiring": "PASS",
+    "AC10_smoke_test": "PASS"
+  },
+  "smokeTest": {
+    "command": "SMOKE_PORT=3702 node scripts/smoke-test.mjs",
+    "checksTotal": 36,
+    "checksPass": 36,
+    "result": "PASS"
+  }
+}

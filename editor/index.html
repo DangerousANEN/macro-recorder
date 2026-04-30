@@ -576,6 +576,19 @@
             <button class="action-card" data-new-action="assert"><span class="ac-icon">✅</span><span class="ac-name">Проверка (assert)</span><span class="ac-desc">Падает если условие ложно</span></button>
             <button class="action-card" data-new-action="screenshot"><span class="ac-icon">📸</span><span class="ac-name">Скриншот</span><span class="ac-desc">PNG страницы → data/snapshots/runtime/</span></button>
             <button class="action-card" data-new-action="extract"><span class="ac-icon">🔍</span><span class="ac-name">Извлечь (regex)</span><span class="ac-desc">Группа из текста → переменная</span></button>
+            <button class="action-card" data-new-action="delay"><span class="ac-icon">⏸</span><span class="ac-name">Пауза</span><span class="ac-desc">Фикс. ms или случайно min..max сек</span></button>
+            <button class="action-card" data-new-action="hover"><span class="ac-icon">👇</span><span class="ac-name">Hover</span><span class="ac-desc">Навести курсор на элемент</span></button>
+            <button class="action-card" data-new-action="eval-js"><span class="ac-icon">🔧</span><span class="ac-name">Выполнить JS</span><span class="ac-desc">JS в контексте страницы → переменная</span></button>
+          </div>
+        </div>
+        <div class="action-category">
+          <div class="category-title">🍪 Cookies и вкладки</div>
+          <div class="action-cards">
+            <button class="action-card" data-new-action="set-cookie"><span class="ac-icon">🍪</span><span class="ac-name">Установить cookie</span><span class="ac-desc">name/value/domain/expires</span></button>
+            <button class="action-card" data-new-action="clear-cookies"><span class="ac-icon">🧹</span><span class="ac-name">Очистить cookies</span><span class="ac-desc">Все или по домену</span></button>
+            <button class="action-card" data-new-action="tab-open"><span class="ac-icon">🆕</span><span class="ac-name">Открыть вкладку</span><span class="ac-desc">Новая вкладка с URL</span></button>
+            <button class="action-card" data-new-action="tab-switch"><span class="ac-icon">🗂</span><span class="ac-name">Переключить вкладку</span><span class="ac-desc">По индексу или URL</span></button>
+            <button class="action-card" data-new-action="tab-close"><span class="ac-icon">❌</span><span class="ac-name">Закрыть вкладку</span><span class="ac-desc">Текущую или по индексу</span></button>
           </div>
         </div>
       </div>
@@ -986,6 +999,54 @@
             <div class="form-group" style="flex:1"><label>Сохранить в</label><input type="text" id="cfgExtractSaveAs" class="settings-input" placeholder="extracted_id"></div>
           </div>
           <div class="config-var-hint">💡 Если шаблон не сработал — переменная получит пустую строку.</div>
+        </div>
+        <!-- Delay -->
+        <div class="config-section" id="cfgDelaySection">
+          <div class="form-group">
+            <label>Фикс. пауза (мс)</label>
+            <input type="text" id="cfgDelayMs" class="settings-input" placeholder="например 1500 или {{wait_ms}}">
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="flex:1"><label>Случайно: мин (с)</label><input type="number" id="cfgDelayMin" class="settings-input" placeholder="0" min="0" step="0.1"></div>
+            <div class="form-group" style="flex:1"><label>Случайно: макс (с)</label><input type="number" id="cfgDelayMax" class="settings-input" placeholder="0" min="0" step="0.1"></div>
+          </div>
+          <div class="config-var-hint">💡 Заполните либо «Фикс. пауза», либо мин/макс. Если фикс. > 0 — он используется. Иначе берётся случайное число в диапазоне.</div>
+        </div>
+        <!-- Set-cookie -->
+        <div class="config-section" id="cfgSetCookieSection">
+          <div class="form-row">
+            <div class="form-group" style="flex:1"><label>Имя cookie</label><input type="text" id="cfgCookieName" class="settings-input" placeholder="session_id"></div>
+            <div class="form-group" style="flex:1"><label>Значение</label><input type="text" id="cfgCookieValue" class="settings-input" placeholder="abc123 или {{token}}"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="flex:1"><label>Домен (опц., default=текущий хост)</label><input type="text" id="cfgCookieDomain" class="settings-input" placeholder=".example.com"></div>
+            <div class="form-group" style="flex:1"><label>Путь</label><input type="text" id="cfgCookiePath" class="settings-input" placeholder="/" value="/"></div>
+            <div class="form-group" style="flex:1"><label>Срок жизни (сек, 0=session)</label><input type="number" id="cfgCookieExpires" class="settings-input" placeholder="0" min="0"></div>
+          </div>
+        </div>
+        <!-- Clear-cookies -->
+        <div class="config-section" id="cfgClearCookiesSection">
+          <div class="form-group"><label>Домен (опц., пусто = очистить ВСЁ)</label><input type="text" id="cfgClearCookieDomain" class="settings-input" placeholder=".example.com"></div>
+        </div>
+        <!-- Tab-switch -->
+        <div class="config-section" id="cfgTabSwitchSection">
+          <div class="form-row">
+            <div class="form-group" style="flex:1"><label>Индекс вкладки</label><input type="text" id="cfgTabIndex" class="settings-input" placeholder="0 или {{tab_id}}"></div>
+            <div class="form-group" style="flex:1"><label>Или URL содержит</label><input type="text" id="cfgTabUrlContains" class="settings-input" placeholder="example.com"></div>
+          </div>
+          <div class="config-var-hint">💡 Сначала проверяется «URL содержит», затем индекс. Если не найдено — ошибка.</div>
+        </div>
+        <!-- Tab-close -->
+        <div class="config-section" id="cfgTabCloseSection">
+          <div class="form-group"><label>Индекс вкладки (пусто = текущая)</label><input type="text" id="cfgTabCloseIndex" class="settings-input" placeholder="0 или {{tab_id}}"></div>
+        </div>
+        <!-- Eval JS -->
+        <div class="config-section" id="cfgEvalJsSection">
+          <label class="config-label">JavaScript (выполнится в контексте страницы)</label>
+          <textarea id="cfgEvalJsCode" class="python-editor" rows="8" placeholder="// Доступ к window/document. Используйте return для возврата значения.
+const links = Array.from(document.querySelectorAll('a')).map(a => a.href);
+return links.join(',');"></textarea>
+          <div class="config-var-hint">💡 Возвращаемое значение сохраняется в переменную (поле «Сохранить в» выше). Не-строки сериализуются в JSON.</div>
         </div>
       </div>
       <div class="modal-buttons">
