@@ -79,6 +79,8 @@
             <button class="btn btn-primary" id="runToBtn">▶ До выбранного</button>
             <button class="btn btn-warning" id="appendRecordBtn">🔴 Дозапись</button>
             <button class="btn btn-accent" id="addStepBtn">＋ Добавить</button>
+            <button class="btn btn-secondary" id="undoBtn" title="Отменить (Ctrl+Z)">↩️</button>
+            <button class="btn btn-secondary" id="redoBtn" title="Повторить (Ctrl+Y / Ctrl+Shift+Z)">↪️</button>
             <button class="btn btn-secondary" id="exportMacroBtn" title="Скачать макрос как JSON">💾</button>
             <button class="btn btn-danger" id="deleteMacroBtn">🗑</button>
           </div>
@@ -128,6 +130,15 @@
         <div class="debug-vars-header">📊 Переменные</div>
         <div class="debug-vars-list" id="debugVarsList">
           <div class="debug-vars-empty">Ожидание отладки...</div>
+        </div>
+        <div class="debug-watch-section">
+          <div class="debug-watch-header">
+            <span>👁 Watch-выражения</span>
+            <button class="btn-icon" id="addWatchBtn" title="Добавить выражение">＋</button>
+          </div>
+          <div class="debug-watch-list" id="debugWatchList">
+            <div class="debug-vars-empty">Нет выражений. Кликните «＋» чтобы добавить.</div>
+          </div>
         </div>
       </div>
 
