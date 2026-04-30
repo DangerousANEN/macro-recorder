@@ -1,0 +1,28 @@
+{
+  "task": "agent-debug",
+  "branch": "devin/1777560006-agent-debug",
+  "acs": {
+    "AC1_run_history": "PASS",
+    "AC2_http_endpoints": "PASS",
+    "AC3_mcp_tools": "PASS",
+    "AC4_node_check": "PASS",
+    "AC5_smoke": "PASS",
+    "AC6_smoke_mcp": "PASS"
+  },
+  "newEndpoints": [
+    "GET /api/running/:runId/events",
+    "GET /api/running/:runId/failures",
+    "GET /api/running/:runId/inspect",
+    "POST /api/running/:runId/query-dom",
+    "PATCH /api/macros/:id/steps/:stepPath"
+  ],
+  "newMcpTools": [
+    "get_run_events",
+    "get_last_failure",
+    "inspect_running_page",
+    "query_dom",
+    "patch_step"
+  ],
+  "smokeAssertions": 42,
+  "mcpSmokeAssertions": 18
+}

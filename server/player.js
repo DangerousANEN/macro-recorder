@@ -17,6 +17,7 @@ import {
   smartFill as _smartFill,
   debugHighlightAndShot as _debugHighlightAndShot,
 } from './selectors.js';
+import { recordEvent as _recordRunEvent, markFinished as _markRunFinished } from './run-history.js';
 
 // --- External stop (from server/index.js) ---
 export async function stopCurrentRun(reason = 'stop-requested') {
@@ -65,6 +66,21 @@ let page = null;
 let runtimeVars = {};
 let stopRequested = false;
 let currentMacroId = null;
+let currentRunId = null;
+
+/**
+ * Set/clear the current run id so broadcastStatus events can be tagged into
+ * `run-history.js` for the agent-debug API. Called by index.js around each
+ * runMacro/runMacroLoop/runMacroParallel invocation.
+ */
+export function setCurrentRunId(id) { currentRunId = id || null; }
+
+/**
+ * Return the live Playwright page (or null). Used by the inspect/query-dom
+ * HTTP endpoints so the agent can introspect what the running browser sees
+ * without taking a screenshot.
+ */
+export function getActivePage() { return page; }
 
 // --- Execution diagnostics (best-effort) ---
 let lastStepPath = null;
@@ -733,6 +749,11 @@ async function smartFill(p, step, selector, value, timeout, wss, path) {
 }
 
 function broadcastStatus(wss, msg) {
+  // Always log into the per-run ring buffer (regardless of WS subscribers) so
+  // an agent polling /api/running/<runId>/events sees structured progress.
+  if (currentRunId && msg && typeof msg === 'object') {
+    try { _recordRunEvent(currentRunId, msg); } catch {}
+  }
   if (!wss) return;
   const data = JSON.stringify(msg);
   for (const client of wss.clients) {
