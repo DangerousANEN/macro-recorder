@@ -28,7 +28,11 @@ Chrome Extension (запись)  →  WebSocket  →  Server (localhost:3700)
 
 ## Установка
 
-### Сервер
+> **Windows:** есть отдельный пошаговый гайд с установкой как Windows-сервиса
+> через NSSM и подключением MCP к Claude Desktop / Cursor / Devin —
+> [docs/install-windows.md](docs/install-windows.md).
+
+### Сервер (Linux / macOS / Windows)
 
 ```bash
 cd server
