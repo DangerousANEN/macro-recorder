@@ -1,0 +1,1 @@
+{"name":"Запрос ввода","icon":"💬","color":"#89b4fa","type":"atomic","fields":["promptTitle","saveAs"]}

@@ -1,0 +1,255 @@
+{
+  "break": {
+    "name": "Прервать цикл",
+    "icon": "🛑",
+    "color": "#f38ba8",
+    "type": "atomic",
+    "fields": []
+  },
+  "clear-field": {
+    "name": "Очистить поле",
+    "icon": "🧹",
+    "color": "#89b4fa",
+    "type": "atomic",
+    "fields": [
+      "cssSelector"
+    ]
+  },
+  "click-current": {
+    "name": "Клик текущий",
+    "icon": "👆",
+    "color": "#94e2d5",
+    "type": "atomic",
+    "fields": []
+  },
+  "click": {
+    "name": "Клик",
+    "icon": "📌",
+    "color": "#89b4fa",
+    "type": "atomic",
+    "fields": [
+      "cssSelector"
+    ]
+  },
+  "continue": {
+    "name": "Следующая итерация",
+    "icon": "⏭",
+    "color": "#fab387",
+    "type": "atomic",
+    "fields": []
+  },
+  "get-sms-code": {
+    "name": "SMS-код",
+    "icon": "📱",
+    "color": "#fab387",
+    "type": "atomic",
+    "fields": []
+  },
+  "go-back": {
+    "name": "Назад (браузер)",
+    "icon": "↩️",
+    "color": "#89b4fa",
+    "type": "atomic",
+    "fields": []
+  },
+  "if": {
+    "name": "Условие (если)",
+    "icon": "❓",
+    "color": "#f9e2af",
+    "type": "block",
+    "fields": [
+      "conditionVar",
+      "operator",
+      "compareValue"
+    ]
+  },
+  "loop-elements": {
+    "name": "Цикл по элементам",
+    "icon": "🔁",
+    "color": "#a6e3a1",
+    "type": "block",
+    "fields": [
+      "cssSelector",
+      "varName"
+    ]
+  },
+  "loop-table": {
+    "name": "Цикл по таблице",
+    "icon": "🔄",
+    "color": "#a6e3a1",
+    "type": "block",
+    "fields": [
+      "tableName"
+    ]
+  },
+  "loop": {
+    "name": "Цикл",
+    "icon": "🔁",
+    "color": "#a6e3a1",
+    "type": "block",
+    "fields": [
+      "loopMode",
+      "cssSelector",
+      "tableName",
+      "count",
+      "conditionVar"
+    ]
+  },
+  "navigate": {
+    "name": "Переход",
+    "icon": "🔗",
+    "color": "#89b4fa",
+    "type": "atomic",
+    "fields": [
+      "url"
+    ]
+  },
+  "press-key": {
+    "name": "Клавиша",
+    "icon": "⌨️",
+    "color": "#89b4fa",
+    "type": "atomic",
+    "fields": [
+      "key"
+    ]
+  },
+  "proxy-rotate": {
+    "name": "Смена прокси",
+    "icon": "🔄",
+    "color": "#fab387",
+    "type": "atomic",
+    "fields": []
+  },
+  "python": {
+    "name": "Python-код",
+    "icon": "🐍",
+    "color": "#f9e2af",
+    "type": "atomic",
+    "fields": [
+      "pythonCode"
+    ]
+  },
+  "read-current": {
+    "name": "Чтение текущий",
+    "icon": "👁",
+    "color": "#94e2d5",
+    "type": "atomic",
+    "fields": [
+      "saveAs"
+    ]
+  },
+  "read-table": {
+    "name": "Чтение из таблицы",
+    "icon": "📖",
+    "color": "#fab387",
+    "type": "atomic",
+    "fields": [
+      "tableName",
+      "rowIndex",
+      "columnName",
+      "saveAs"
+    ]
+  },
+  "read": {
+    "name": "Чтение → переменная",
+    "icon": "👁",
+    "color": "#89b4fa",
+    "type": "atomic",
+    "fields": [
+      "cssSelector",
+      "saveAs"
+    ]
+  },
+  "request-code": {
+    "name": "Запрос кода → переменная",
+    "icon": "📲",
+    "color": "#fab387",
+    "type": "atomic",
+    "fields": [
+      "saveAs"
+    ]
+  },
+  "save-to-table": {
+    "name": "В таблицу",
+    "icon": "💾",
+    "color": "#fab387",
+    "type": "atomic",
+    "fields": [
+      "tableName",
+      "value",
+      "columns"
+    ]
+  },
+  "scroll": {
+    "name": "Прокрутка",
+    "icon": "📜",
+    "color": "#89b4fa",
+    "type": "atomic",
+    "fields": [
+      "cssSelector"
+    ]
+  },
+  "set-variable": {
+    "name": "Переменная",
+    "icon": "📝",
+    "color": "#cba6f7",
+    "type": "atomic",
+    "fields": [
+      "varName",
+      "value",
+      "setMode"
+    ]
+  },
+  "try-except": {
+    "name": "Try / Except",
+    "icon": "🛡️",
+    "color": "#f38ba8",
+    "type": "block",
+    "fields": [
+      "onError",
+      "exceptError"
+    ]
+  },
+  "type-current": {
+    "name": "Ввод текущий",
+    "icon": "✍️",
+    "color": "#94e2d5",
+    "type": "atomic",
+    "fields": [
+      "value",
+      "pressEnter"
+    ]
+  },
+  "type": {
+    "name": "Ввод текста",
+    "icon": "✍️",
+    "color": "#89b4fa",
+    "type": "atomic",
+    "fields": [
+      "cssSelector",
+      "value",
+      "pressEnter"
+    ]
+  },
+  "user-input": {
+    "name": "Запрос ввода",
+    "icon": "💬",
+    "color": "#89b4fa",
+    "type": "atomic",
+    "fields": [
+      "promptTitle",
+      "saveAs"
+    ]
+  },
+  "wait": {
+    "name": "Ожидание",
+    "icon": "⏳",
+    "color": "#89b4fa",
+    "type": "atomic",
+    "fields": [
+      "cssSelector",
+      "waitType",
+      "waitTime"
+    ]
+  }
+}

@@ -1,0 +1,163 @@
+/* Highlight overlay */
+#macro-recorder-highlight {
+  position: fixed;
+  pointer-events: none;
+  border: 2px solid #4a90d9;
+  background: rgba(74, 144, 217, 0.1);
+  z-index: 2147483646;
+  transition: all 0.1s ease;
+  border-radius: 3px;
+  display: none;
+}
+
+/* Action menu */
+#macro-recorder-menu {
+  position: fixed;
+  z-index: 2147483647;
+  background: #1e1e2e;
+  border: 1px solid #45475a;
+  border-radius: 10px;
+  padding: 6px;
+  display: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  min-width: 200px;
+}
+
+#macro-recorder-menu .mr-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: #cdd6f4;
+  cursor: pointer;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+}
+
+#macro-recorder-menu .mr-menu-item:hover {
+  background: #313244;
+}
+
+#macro-recorder-menu .mr-menu-item .mr-icon {
+  font-size: 16px;
+  width: 24px;
+  text-align: center;
+}
+
+#macro-recorder-menu .mr-menu-divider {
+  height: 1px;
+  background: #45475a;
+  margin: 4px 8px;
+}
+
+#macro-recorder-menu .mr-menu-item.mr-real-click {
+  color: #fab387;
+}
+
+#macro-recorder-menu .mr-text-input {
+  display: none;
+  padding: 6px 12px;
+}
+
+#macro-recorder-menu .mr-text-input input {
+  width: 100%;
+  padding: 6px 10px;
+  background: #313244;
+  border: 1px solid #585b70;
+  color: #cdd6f4;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+
+#macro-recorder-menu .mr-text-input input:focus {
+  border-color: #89b4fa;
+}
+
+/* Floating status bar */
+#macro-recorder-status {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 2147483647;
+  background: #1e1e2e;
+  border: 1px solid #45475a;
+  border-radius: 10px;
+  padding: 8px 16px;
+  display: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  color: #cdd6f4;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  cursor: move;
+  user-select: none;
+  align-items: center;
+  gap: 10px;
+}
+
+#macro-recorder-status .mr-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #a6e3a1;
+  animation: mr-pulse 1.5s infinite;
+}
+
+#macro-recorder-status .mr-status-dot.paused {
+  background: #fab387;
+  animation: none;
+}
+
+#macro-recorder-status .mr-status-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #585b70;
+  background: #313244;
+  color: #cdd6f4;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+#macro-recorder-status .mr-status-btn:hover {
+  background: #45475a;
+  transform: scale(1.05);
+}
+
+/* Prominent pause button styling */
+#macro-recorder-status #mr-pause-btn {
+  background: #a6e3a1;
+  color: #1e1e2e;
+  border: 1px solid #a6e3a1;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+#macro-recorder-status #mr-pause-btn:hover {
+  background: #94d3a2;
+  transform: scale(1.05);
+}
+
+/* When paused - orange styling */
+#macro-recorder-status .mr-status-dot.paused ~ #mr-pause-btn {
+  background: #fab387;
+  color: #1e1e2e;
+  border-color: #fab387;
+}
+
+#macro-recorder-status .mr-status-dot.paused ~ #mr-pause-btn:hover {
+  background: #f9c487;
+}
+
+@keyframes mr-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

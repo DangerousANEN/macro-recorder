@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Macro Recorder — Редактор</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1>🎬 Макросы</h1>
+        <div style="display:flex;gap:4px">
+          <button class="btn-icon" id="importMacroBtn" title="Импорт макроса (JSON)">📂</button>
+          <button class="btn-icon" id="newMacroBtn" title="Новый макрос">＋</button>
+        </div>
+      </div>
+      <div class="sidebar-search">
+        <input type="text" id="macroSearchInput" class="settings-input" placeholder="🔍 Поиск по названию..." autocomplete="off">
+      </div>
+      <div class="macro-list" id="macroList">
+        <div class="empty-state">Нет макросов</div>
+      </div>
+      <input type="file" id="importMacroFile" accept="application/json,.json" style="display:none">
+      <div id="runningMacrosPanel" style="display:none;border-top:1px solid var(--surface1);padding:8px;max-height:150px;overflow-y:auto">
+        <div style="font-size:11px;color:var(--overlay);margin-bottom:4px;font-weight:700">🏃 Запущенные:</div>
+        <div id="runningMacrosList"></div>
+      </div>
+      <div class="sidebar-footer">
+        <button class="sidebar-btn" id="overviewBtn">📊 Overview</button>
+        <button class="sidebar-btn" id="autoregBtn">📱 Авторегистрация</button>
+        <button class="sidebar-btn" id="settingsBtn">⚙️ Настройки</button>
+      </div>
+    </aside>
+
+    <!-- Main area -->
+    <main class="main">
+      <!-- No macro selected -->
+      <div class="empty-main" id="emptyMain">
+        <div class="empty-icon">🎬</div>
+        <h2>Macro Recorder</h2>
+        <p>Выберите макрос слева или создайте новый</p>
+        <div class="feature-grid">
+          <div class="feature-card">
+            <span class="feature-icon">📸</span>
+            <span class="feature-title">Снапшоты</span>
+            <span class="feature-desc">Визуальный выбор элементов на скриншоте страницы</span>
+          </div>
+          <div class="feature-card">
+            <span class="feature-icon">🧱</span>
+            <span class="feature-title">Блоки</span>
+            <span class="feature-desc">Циклы, условия, вложенность</span>
+          </div>
+          <div class="feature-card">
+            <span class="feature-icon">🔄</span>
+            <span class="feature-title">Таблицы</span>
+            <span class="feature-desc">Массовая обработка данных</span>
+          </div>
+          <div class="feature-card">
+            <span class="feature-icon">🌐</span>
+            <span class="feature-title">Прокси</span>
+            <span class="feature-desc">Ротация, фингерпринт, куки</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Macro editor -->
+      <div class="macro-editor" id="macroEditor" style="display:none">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <input type="text" class="macro-name-input" id="macroNameInput" placeholder="Название макроса">
+            <input type="text" class="start-url-input" id="startUrlInput" placeholder="Стартовый URL (опционально)">
+          </div>
+          <div class="toolbar-right">
+            <button class="btn btn-success" id="runAllBtn">▶▶ Запустить</button>
+            <button class="btn btn-secondary" id="debugBtn" title="Запуск с отладкой">🐛 Debug</button>
+            <button class="btn btn-primary" id="runToBtn">▶ До выбранного</button>
+            <button class="btn btn-warning" id="appendRecordBtn">🔴 Дозапись</button>
+            <button class="btn btn-accent" id="addStepBtn">＋ Добавить</button>
+            <button class="btn btn-secondary" id="exportMacroBtn" title="Скачать макрос как JSON">💾</button>
+            <button class="btn btn-danger" id="deleteMacroBtn">🗑</button>
+          </div>
+        </div>
+        <div class="steps-container" id="stepsContainer">
+          <div class="steps-empty" id="stepsEmpty">
+            <div class="steps-empty-icon">🧱</div>
+            <h3>Конструктор макросов</h3>
+            <p>Начните запись через расширение или добавьте шаги вручную</p>
+            <button class="btn btn-accent btn-large" id="addStepEmptyBtn">＋ Добавить первый шаг</button>
+          </div>
+          <!-- Debug Controls (pinned while scrolling steps) -->
+          <div class="debug-controls debug-controls-steps" id="debugControls" style="display:none">
+            <button id="debugStepOver" disabled title="Перешагнуть (не входить в блоки)">⏭ Step Over</button>
+            <button id="debugStepInto" disabled title="Войти внутрь блока">⬇ Step Into</button>
+            <button id="debugStepOut" disabled title="Выйти из текущего блока">⬆ Step Out</button>
+            <button id="debugContinue" disabled title="Продолжить до следующей точки остановки">▶ Continue</button>
+            <button id="debugStop" disabled title="Остановить отладку">⏹ Стоп</button>
+            <button id="debugAutoscrollToggle" title="Автоскролл к текущему шагу" class="debug-autoscroll-btn">📌 Автоскролл</button>
+            <span class="debug-status" id="debugStatus"></span>
+          </div>
+          <div class="steps-list" id="editorStepsList"></div>
+        </div>
+        <div class="console-panel" id="consolePanel">
+          <div class="console-header">
+            <div class="console-tabs">
+              <button class="console-tab active" data-console="all">📋 Все</button>
+              <button class="console-tab" data-console="macro">🎬 Макрос</button>
+              <button class="console-tab" data-console="python">🐍 Python</button>
+              <button class="console-tab" data-console="errors">❌ Ошибки</button>
+              <button class="console-tab" data-console="autoreg">📱 Авторег</button>
+            </div>
+            <div class="console-actions">
+              <span id="connectionStatus" style="font-size:11px;color:var(--subtext)">🔌 Подключение...</span>
+              <button class="console-action-btn" id="consoleToggle" title="Свернуть">▼</button>
+              <button class="console-action-btn" id="consoleClear" title="Очистить">🗑</button>
+            </div>
+          </div>
+          <div class="console-body" id="consoleBody">
+            <div class="console-log" id="consoleLog"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Debug Variables Panel (right side, shown during debug) -->
+      <div class="debug-vars-panel" id="debugVarsPanel" style="display:none">
+        <div class="debug-vars-header">📊 Переменные</div>
+        <div class="debug-vars-list" id="debugVarsList">
+          <div class="debug-vars-empty">Ожидание отладки...</div>
+        </div>
+      </div>
+
+      <!-- Overview panel -->
+      <div class="overview-panel" id="overviewPanel" style="display:none">
+        <div class="overview-header">
+          <h2>📊 Overview</h2>
+          <button class="btn btn-secondary" id="closeOverviewBtn">← Назад</button>
+        </div>
+
+        <!-- Stats cards -->
+        <div class="overview-stats" id="overviewStats">
+          <div class="stat-card">
+            <div class="stat-icon">🎬</div>
+            <div class="stat-value" id="statTotalMacros">0</div>
+            <div class="stat-label">Макросов</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🧱</div>
+            <div class="stat-value" id="statTotalSteps">0</div>
+            <div class="stat-label">Шагов</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">▶</div>
+            <div class="stat-value" id="statRunning">0</div>
+            <div class="stat-label">Запущено</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">❌</div>
+            <div class="stat-value" id="statErrors">0</div>
+            <div class="stat-label">Ошибок</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">⏱</div>
+            <div class="stat-value" id="statUptime">0м</div>
+            <div class="stat-label">Сессия</div>
+          </div>
+        </div>
+
+        <!-- Console -->
+        <div class="overview-console">
+          <div class="console-header">
+            <div class="console-tabs">
+              <button class="console-tab active" data-ov-console="all">📋 Все логи</button>
+              <button class="console-tab" data-ov-console="macro">🎬 Макрос</button>
+              <button class="console-tab" data-ov-console="python">🐍 Python</button>
+              <button class="console-tab" data-ov-console="errors">❌ Ошибки</button>
+            </div>
+            <div class="console-actions">
+              <button class="console-action-btn" id="ovConsoleClear" title="Очистить">🗑</button>
+            </div>
+          </div>
+          <div class="console-body" id="ovConsoleBody">
+            <div class="console-log" id="ovConsoleLog"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings panel -->
+      <div class="settings-panel" id="settingsPanel" style="display:none">
+        <div class="settings-header">
+          <h2>⚙️ Настройки</h2>
+          <button class="btn btn-secondary" id="closeSettingsBtn">← Назад</button>
+        </div>
+        <div class="settings-tabs">
+          <button class="settings-tab active" data-tab="sms">📱 SMS</button>
+          <button class="settings-tab" data-tab="proxy">🌐 Прокси</button>
+          <button class="settings-tab" data-tab="fingerprint">🎭 Фингерпринт</button>
+          <button class="settings-tab" data-tab="cookies">🍪 Куки</button>
+          <button class="settings-tab" data-tab="profiles">👤 Профили</button>
+          <button class="settings-tab" data-tab="variables">📋 Переменные</button>
+          <button class="settings-tab" data-tab="tables">📊 Таблицы</button>
+          <button class="settings-tab" data-tab="backup">💾 Резервные копии</button>
+        </div>
+        <div class="settings-content tab-content active" id="tab-sms">
+          <div class="settings-section">
+            <h3>Активный сервис</h3>
+            <select id="smsActiveService" class="settings-select">
+              <option value="">Не выбран</option>
+              <option value="sms-activate">SMS-Activate</option>
+              <option value="5sim">5sim</option>
+              <option value="smshub">SMSHub</option>
+              <option value="custom">Свой API</option>
+            </select>
+          </div>
+          <div class="settings-section" id="smsServiceSettings">
+            <h3>API настройки</h3>
+            <div class="form-group"><label>API Ключ</label><input type="password" id="smsApiKey" class="settings-input" placeholder="API ключ"></div>
+            <div class="form-group"><label>Base URL</label><input type="text" id="smsBaseUrl" class="settings-input" placeholder="URL API"></div>
+          </div>
+          <button class="btn btn-primary" id="saveSmsBtn">💾 Сохранить</button>
+        </div>
+        <div class="settings-content tab-content" id="tab-proxy">
+          <div class="settings-section">
+            <label class="toggle-label"><input type="checkbox" id="proxyEnabled"> Включить прокси</label>
+          </div>
+          <div class="settings-section">
+            <div class="form-row">
+              <div class="form-group" style="flex:1"><label>Тип</label><select id="proxyType" class="settings-select"><option value="http">HTTP</option><option value="socks5">SOCKS5</option></select></div>
+              <div class="form-group" style="flex:2"><label>Хост</label><input type="text" id="proxyHost" class="settings-input" placeholder="123.45.67.89"></div>
+              <div class="form-group" style="flex:1"><label>Порт</label><input type="text" id="proxyPort" class="settings-input" placeholder="8080"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="flex:1"><label>Логин</label><input type="text" id="proxyUser" class="settings-input"></div>
+              <div class="form-group" style="flex:1"><label>Пароль</label><input type="password" id="proxyPass" class="settings-input"></div>
+            </div>
+            <div class="form-group"><label>URL ротации</label><input type="text" id="proxyRotationUrl" class="settings-input" placeholder="https://api.proxy.com/rotate?key=XXX"></div>
+          </div>
+          <div class="settings-section">
+            <h3>Список прокси</h3>
+            <textarea id="proxyList" class="settings-textarea" rows="6" placeholder="host:port:user:pass"></textarea>
+          </div>
+          <button class="btn btn-primary" id="saveProxyBtn">💾 Сохранить</button>
+        </div>
+        <div class="settings-content tab-content" id="tab-fingerprint">
+          <div class="settings-section">
+            <label class="toggle-label"><input type="checkbox" id="fpEnabled"> Включить подмену</label>
+          </div>
+          <div class="form-group"><label>User-Agent</label><input type="text" id="fpUserAgent" class="settings-input"></div>
+          <div class="form-row">
+            <div class="form-group" style="flex:1"><label>Язык</label><input type="text" id="fpLanguage" class="settings-input" value="ru-RU"></div>
+            <div class="form-group" style="flex:1"><label>Timezone</label><input type="text" id="fpTimezone" class="settings-input" value="Europe/Moscow"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="flex:1"><label>Экран</label><input type="text" id="fpScreen" class="settings-input" value="1920x1080"></div>
+            <div class="form-group" style="flex:1"><label>Платформа</label><input type="text" id="fpPlatform" class="settings-input" value="Win32"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="flex:1"><label>CPU</label><input type="number" id="fpCores" class="settings-input" value="8"></div>
+            <div class="form-group" style="flex:1"><label>RAM</label><input type="number" id="fpMemory" class="settings-input" value="8"></div>
+          </div>
+          <div class="form-group"><label>WebGL Vendor</label><input type="text" id="fpWebgl" class="settings-input"></div>
+          <button class="btn btn-primary" id="saveFpBtn">💾 Сохранить</button>
+        </div>
+        <div class="settings-content tab-content" id="tab-cookies">
+          <div class="settings-section">
+            <label class="toggle-label"><input type="checkbox" id="cookieAutoSave"> Авто-сохранение</label>
+            <label class="toggle-label"><input type="checkbox" id="cookieAutoLoad"> Авто-загрузка</label>
+          </div>
+          <div class="settings-section">
+            <h3>Профили</h3>
+            <div class="form-row"><input type="text" id="newCookieProfile" class="settings-input" placeholder="Имя профиля" style="flex:1"><button class="btn btn-secondary" id="addCookieProfile">＋</button></div>
+            <div id="cookieProfilesList" class="profiles-list"></div>
+          </div>
+          <div class="settings-section">
+            <h3>Импорт JSON</h3>
+            <textarea id="cookieImport" class="settings-textarea" rows="4" placeholder='[{"name":"session","value":"abc"}]'></textarea>
+            <button class="btn btn-primary" id="importCookiesBtn" style="margin-top:8px">📥 Импортировать</button>
+          </div>
+          <button class="btn btn-primary" id="saveCookiesBtn">💾 Сохранить</button>
+        </div>
+        <div class="settings-content tab-content" id="tab-profiles">
+          <div class="settings-section">
+            <h3>Браузерные профили</h3>
+            <p class="settings-hint">Профили сохраняют cookies, localStorage, IndexedDB между сессиями</p>
+            <div class="form-row">
+              <input type="text" id="newProfileName" class="settings-input" placeholder="Имя профиля" style="flex:1">
+              <button class="btn btn-secondary" id="createProfileBtn">＋ Создать</button>
+            </div>
+            <div id="profilesList" class="profiles-list"></div>
+          </div>
+        </div>
+        <div class="settings-content tab-content" id="tab-variables">
+          <div class="settings-section">
+            <h3>Глобальные переменные</h3>
+            <p class="settings-hint">Используйте <code>{{имя}}</code> в шагах</p>
+            <div id="variablesList" class="variables-list"></div>
+            <div class="form-row" style="margin-top:8px">
+              <input type="text" id="newVarName" class="settings-input" placeholder="Имя" style="flex:1">
+              <input type="text" id="newVarValue" class="settings-input" placeholder="Значение" style="flex:2">
+              <button class="btn btn-secondary" id="addVariableBtn">＋</button>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="saveVarsBtn">💾 Сохранить</button>
+        </div>
+        <div class="settings-content tab-content" id="tab-tables">
+          <div class="settings-section">
+            <h3>Таблицы данных</h3>
+            <p class="settings-hint">Для <code>🔄 Цикл по таблице</code> — каждая строка = одна итерация</p>
+            <div class="form-row">
+              <input type="text" id="newTableName" class="settings-input" placeholder="Имя таблицы" style="flex:1">
+              <button class="btn btn-secondary" id="addTableBtn">＋ Создать</button>
+            </div>
+            <div class="form-group" style="margin-top:8px">
+              <label>Или CSV</label>
+              <input type="file" id="csvFileInput" accept=".csv,.tsv,.txt">
+            </div>
+            <div id="tablesList" class="tables-list"></div>
+          </div>
+        </div>
+        <div class="settings-content tab-content" id="tab-backup">
+          <div class="settings-section">
+            <h3>💾 Резервные копии проекта</h3>
+            <p class="settings-hint">ZIP-архивы сохраняются в <code>F:\ANEN\Desktop\macro-recorder-backups\</code>. Хранятся последние 10 копий.</p>
+            <button class="btn btn-success" id="createBackupBtn" style="margin-bottom:12px">💾 Сохранить версию</button>
+            <div class="backup-status" id="backupStatus"></div>
+            <h3 style="margin-top:16px">Сохранённые копии</h3>
+            <div class="backup-list" id="backupList">
+              <div style="color:var(--overlay);font-size:13px;padding:12px;text-align:center">Загрузка...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AC39: Авторегистрация panel -->
+      <div class="autoreg-panel" id="autoregPanel" style="display:none">
+        <div class="settings-header">
+          <h2>📱 Авторегистрация</h2>
+          <button class="btn btn-secondary" id="closeAutoregBtn">← Назад</button>
+        </div>
+        <div class="settings-tabs">
+          <button class="settings-tab active" data-autoreg-tab="stats">📊 Статистика</button>
+          <button class="settings-tab" data-autoreg-tab="accounts">📋 Аккаунты</button>
+          <button class="settings-tab" data-autoreg-tab="autoreg-settings">⚙️ Настройки</button>
+        </div>
+
+        <!-- AC41: Live statistics sub-panel -->
+        <div class="settings-content tab-content active" id="autoreg-tab-stats">
+          <div class="overview-stats" id="autoregStats">
+            <div class="stat-card">
+              <div class="stat-icon">🎯</div>
+              <div class="stat-value" id="arStatAttempts">0</div>
+              <div class="stat-label">Попыток</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">✅</div>
+              <div class="stat-value" id="arStatSuccess">0</div>
+              <div class="stat-label">Успешно</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">❌</div>
+              <div class="stat-value" id="arStatFailed">0</div>
+              <div class="stat-label">Провалено</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📈</div>
+              <div class="stat-value" id="arStatRate">0%</div>
+              <div class="stat-label">Успех</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">⏱</div>
+              <div class="stat-value" id="arStatAvgTime">0с</div>
+              <div class="stat-label">Среднее время</div>
+            </div>
+          </div>
+          <div class="settings-section" style="margin-top:16px">
+            <h3>📊 Ошибки по причинам</h3>
+            <div id="arFailureReasons" style="font-size:13px;color:var(--subtext)">Нет данных</div>
+          </div>
+          <button class="btn btn-primary" id="arRefreshStats" style="margin-top:12px">🔄 Обновить</button>
+        </div>
+
+        <!-- AC42: Accounts table sub-panel -->
+        <div class="settings-content tab-content" id="autoreg-tab-accounts">
+          <div class="settings-section">
+            <div class="form-row" style="margin-bottom:8px">
+              <select id="arAccountsFilter" class="settings-select" style="width:auto">
+                <option value="registered">✅ Зарегистрированные</option>
+                <option value="failed">❌ Провалённые</option>
+                <option value="in-progress">⏳ В процессе</option>
+              </select>
+              <button class="btn btn-secondary" id="arAccountsRefresh">🔄 Обновить</button>
+              <button class="btn btn-secondary" id="arAccountsExport">📥 Экспорт CSV</button>
+            </div>
+            <div id="arAccountsTable" style="overflow-x:auto">
+              <table class="accounts-table" style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead id="arAccountsHead"><tr><th>Загрузка...</th></tr></thead>
+                <tbody id="arAccountsBody"></tbody>
+              </table>
+            </div>
+            <div class="form-row" style="margin-top:8px;justify-content:center">
+              <button class="btn btn-secondary btn-small" id="arAccountsPrev">← Назад</button>
+              <span id="arAccountsPage" style="padding:4px 12px;color:var(--subtext);font-size:12px">1</span>
+              <button class="btn btn-secondary btn-small" id="arAccountsNext">Далее →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- AC40: Settings sub-panel -->
+        <div class="settings-content tab-content" id="autoreg-tab-autoreg-settings">
+          <div class="settings-section">
+            <h3>📱 SMS-сервисы</h3>
+            <div class="form-group">
+              <label>SMS-Activate API ключ</label>
+              <div class="form-row">
+                <input type="password" id="arSmsActivateKey" class="settings-input" style="flex:1">
+                <button class="btn btn-secondary btn-small" id="arSmsActivateBalance">💰 Баланс</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>5sim API ключ</label>
+              <div class="form-row">
+                <input type="password" id="ar5simKey" class="settings-input" style="flex:1">
+                <button class="btn btn-secondary btn-small" id="ar5simBalance">💰 Баланс</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>SMSHub API ключ</label>
+              <div class="form-row">
+                <input type="password" id="arSmshubKey" class="settings-input" style="flex:1">
+                <button class="btn btn-secondary btn-small" id="arSmshubBalance">💰 Баланс</button>
+              </div>
+            </div>
+          </div>
+          <div class="settings-section">
+            <h3>🧩 Капча-сервисы</h3>
+            <div class="form-group">
+              <label>2captcha API ключ</label>
+              <div class="form-row">
+                <input type="password" id="ar2captchaKey" class="settings-input" style="flex:1">
+                <button class="btn btn-secondary btn-small" id="ar2captchaBalance">💰 Баланс</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>AntiCaptcha API ключ</label>
+              <div class="form-row">
+                <input type="password" id="arAnticaptchaKey" class="settings-input" style="flex:1">
+                <button class="btn btn-secondary btn-small" id="arAnticaptchaBalance">💰 Баланс</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Активный капча-сервис</label>
+              <select id="arCaptchaActive" class="settings-select">
+                <option value="2captcha">2captcha</option>
+                <option value="anticaptcha">AntiCaptcha</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-section">
+            <h3>⚙️ Конфигурация авторега</h3>
+            <div class="form-row">
+              <div class="form-group" style="flex:1">
+                <label>Страна по умолчанию</label>
+                <select id="arDefaultCountry" class="settings-select">
+                  <option value="ru">🇷🇺 Россия</option>
+                  <option value="ua">🇺🇦 Украина</option>
+                  <option value="kz">🇰🇿 Казахстан</option>
+                  <option value="us">🇺🇸 США</option>
+                  <option value="gb">🇬🇧 Великобритания</option>
+                  <option value="de">🇩🇪 Германия</option>
+                  <option value="fr">🇫🇷 Франция</option>
+                </select>
+              </div>
+              <div class="form-group" style="flex:1">
+                <label>Порог успеха (%)</label>
+                <input type="number" id="arSuccessThreshold" class="settings-input" value="30" min="1" max="100">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="flex:1">
+                <label>Таймаут SMS (сек)</label>
+                <input type="number" id="arSmsTimeout" class="settings-input" value="120" min="30" max="600">
+              </div>
+              <div class="form-group" style="flex:1">
+                <label>Множитель задержки</label>
+                <input type="number" id="arDelayMultiplier" class="settings-input" value="1" min="0.5" max="10" step="0.5">
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="arSaveSettings">💾 Сохранить настройки</button>
+          <span id="arSettingsStatus" style="margin-left:8px;font-size:12px;color:var(--green)"></span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ADD STEP MODAL — карточки категорий -->
+  <div class="modal-overlay" id="addStepModal" style="display:none">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3>＋ Добавить шаг</h3>
+        <button class="modal-close" id="cancelAddStep">✕</button>
+      </div>
+      <div class="action-categories">
+        <div class="action-category">
+          <div class="category-title">📌 Основные</div>
+          <div class="action-cards">
+            <button class="action-card" data-new-action="click"><span class="ac-icon">📌</span><span class="ac-name">Клик</span><span class="ac-desc">Кликнуть по элементу</span></button>
+            <button class="action-card" data-new-action="type"><span class="ac-icon">✍️</span><span class="ac-name">Ввод текста</span><span class="ac-desc">Ввести текст или {{переменную}}</span></button>
+            <button class="action-card" data-new-action="read"><span class="ac-icon">👁</span><span class="ac-name">Чтение → перем.</span><span class="ac-desc">Прочитать текст и сохранить</span></button>
+            <button class="action-card" data-new-action="wait"><span class="ac-icon">⏳</span><span class="ac-name">Ожидание</span><span class="ac-desc">Ждать элемент или время</span></button>
+            <button class="action-card" data-new-action="navigate"><span class="ac-icon">🔗</span><span class="ac-name">Переход</span><span class="ac-desc">Открыть URL</span></button>
+            <button class="action-card" data-new-action="go-back"><span class="ac-icon">↩️</span><span class="ac-name">Назад</span><span class="ac-desc">Вернуться на пред. страницу</span></button>
+            <button class="action-card" data-new-action="scroll"><span class="ac-icon">📜</span><span class="ac-name">Прокрутка</span><span class="ac-desc">Прокрутить к элементу</span></button>
+            <button class="action-card" data-new-action="press-key"><span class="ac-icon">⌨️</span><span class="ac-name">Клавиша</span><span class="ac-desc">Enter, Tab, Escape...</span></button>
+            <button class="action-card" data-new-action="clear-field"><span class="ac-icon">🧹</span><span class="ac-name">Очистить</span><span class="ac-desc">Очистить поле ввода</span></button>
+            <button class="action-card" data-new-action="user-input"><span class="ac-icon">💬</span><span class="ac-name">Запрос ввода</span><span class="ac-desc">Пользователь вводит значение (input)</span></button>
+          </div>
+        </div>
+        <div class="action-category">
+          <div class="category-title">🔁 Циклы и условия</div>
+          <div class="action-cards">
+            <button class="action-card card-loop" data-new-action="loop"><span class="ac-icon">🔁</span><span class="ac-name">Цикл</span><span class="ac-desc">Элементы / Таблица / N раз / Условие</span></button>
+            <button class="action-card card-condition" data-new-action="if"><span class="ac-icon">❓</span><span class="ac-name">Условие</span><span class="ac-desc">Если переменная = значение</span></button>
+            <button class="action-card card-tryexcept" data-new-action="try-except"><span class="ac-icon">🛡️</span><span class="ac-name">Try / Except</span><span class="ac-desc">Обработка ошибок (pass, stop, код)</span></button>
+          </div>
+        </div>
+        <div class="action-category" id="loopControlCategory" style="display:none">
+          <div class="category-title">🔁 Управление циклом</div>
+          <div class="action-cards">
+            <button class="action-card card-break" data-new-action="break"><span class="ac-icon">🛑</span><span class="ac-name">Прервать цикл</span><span class="ac-desc">Выход из текущего цикла</span></button>
+            <button class="action-card card-continue" data-new-action="continue"><span class="ac-icon">⏭</span><span class="ac-name">Следующая итерация</span><span class="ac-desc">Пропустить остаток и продолжить цикл</span></button>
+          </div>
+        </div>
+        <div class="action-category">
+          <div class="category-title">🔌 Текущий элемент (в цикле)</div>
+          <div class="action-cards">
+            <button class="action-card card-current" data-new-action="click-current"><span class="ac-icon">👆</span><span class="ac-name">Клик текущий</span><span class="ac-desc">Кликнуть текущий элемент цикла</span></button>
+            <button class="action-card card-current" data-new-action="type-current"><span class="ac-icon">✍️</span><span class="ac-name">Ввод текущий</span><span class="ac-desc">Ввести в текущий элемент</span></button>
+            <button class="action-card card-current" data-new-action="read-current"><span class="ac-icon">👁</span><span class="ac-name">Чтение текущий</span><span class="ac-desc">Прочитать текст текущего</span></button>
+          </div>
+        </div>
+        <div class="action-category">
+          <div class="category-title">🐍 Код</div>
+          <div class="action-cards">
+            <button class="action-card card-python" data-new-action="python"><span class="ac-icon">🐍</span><span class="ac-name">Python-блок</span><span class="ac-desc">Свой код с доступом к переменным</span></button>
+          </div>
+        </div>
+        <div class="action-category">
+          <div class="category-title">📱 Авторегистрация</div>
+          <div class="action-cards">
+            <button class="action-card card-service" data-new-action="get-sms-number"><span class="ac-icon">📱</span><span class="ac-name">Купить номер</span><span class="ac-desc">SMS-сервис → номер + ID</span></button>
+            <button class="action-card card-service" data-new-action="wait-sms-code"><span class="ac-icon">📞</span><span class="ac-name">Ждать SMS код</span><span class="ac-desc">Поллинг кода с автоповтором</span></button>
+            <button class="action-card card-service" data-new-action="solve-captcha"><span class="ac-icon">🧩</span><span class="ac-name">Решить капчу</span><span class="ac-desc">2captcha / anticaptcha</span></button>
+            <button class="action-card card-service" data-new-action="save-account"><span class="ac-icon">📋</span><span class="ac-name">Сохранить аккаунт</span><span class="ac-desc">В базу registered/failed</span></button>
+            <button class="action-card card-service" data-new-action="check-blocked"><span class="ac-icon">🔍</span><span class="ac-name">Проверить блокировку</span><span class="ac-desc">IP или телефон в чёрном списке</span></button>
+            <button class="action-card card-service" data-new-action="human-delay"><span class="ac-icon">⏱️</span><span class="ac-name">Человеческая пауза</span><span class="ac-desc">Случайная задержка 2-5с</span></button>
+            <button class="action-card card-service" data-new-action="release-number"><span class="ac-icon">📧</span><span class="ac-name">Освободить номер</span><span class="ac-desc">Отменить/вернуть номер</span></button>
+          </div>
+        </div>
+        <div class="action-category">
+          <div class="category-title">🌐 Сервисы</div>
+          <div class="action-cards">
+            <button class="action-card card-service" data-new-action="request-code"><span class="ac-icon">📲</span><span class="ac-name">Запрос кода</span><span class="ac-desc">SMS-код → переменная</span></button>
+            <button class="action-card card-service" data-new-action="proxy-rotate"><span class="ac-icon">🔄</span><span class="ac-name">Смена прокси</span><span class="ac-desc">Следующий прокси из списка</span></button>
+            <button class="action-card card-service" data-new-action="browser-init"><span class="ac-icon">🌐</span><span class="ac-name">Init browser</span><span class="ac-desc">Профиль + прокси + перейти на стартовый URL</span></button>
+            <button class="action-card card-service" data-new-action="switch-profile"><span class="ac-icon">🧭</span><span class="ac-name">Switch profile</span><span class="ac-desc">Сменить профиль (и при желании прокси)</span></button>
+            <button class="action-card card-service" data-new-action="save-to-table"><span class="ac-icon">💾</span><span class="ac-name">В таблицу</span><span class="ac-desc">Сохранить данные в таблицу</span></button>
+            <button class="action-card card-service" data-new-action="read-table"><span class="ac-icon">📖</span><span class="ac-name">Из таблицы</span><span class="ac-desc">Прочитать ячейку → переменная</span></button>
+            <button class="action-card card-service" data-new-action="set-variable"><span class="ac-icon">📝</span><span class="ac-name">Переменная</span><span class="ac-desc">Записать / дополнить значение</span></button>
+          </div>
+        </div>
+        <div class="action-category">
+          <div class="category-title">🧪 Проверки и данные</div>
+          <div class="action-cards">
+            <button class="action-card" data-new-action="assert"><span class="ac-icon">✅</span><span class="ac-name">Проверка (assert)</span><span class="ac-desc">Падает если условие ложно</span></button>
+            <button class="action-card" data-new-action="screenshot"><span class="ac-icon">📸</span><span class="ac-name">Скриншот</span><span class="ac-desc">PNG страницы → data/snapshots/runtime/</span></button>
+            <button class="action-card" data-new-action="extract"><span class="ac-icon">🔍</span><span class="ac-name">Извлечь (regex)</span><span class="ac-desc">Группа из текста → переменная</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP CONFIG MODAL — настройка выбранного действия -->
+  <div class="modal-overlay" id="stepConfigModal" style="display:none">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3 id="stepConfigTitle">Настройка шага</h3>
+        <button class="modal-close" id="cancelStepConfig">✕</button>
+      </div>
+      <div class="step-config-body">
+        <!-- Custom step name -->
+        <div class="config-section visible" id="cfgNameSection">
+          <label class="config-label">Название шага <span class="config-hint">(опц. — иконка не меняется)</span></label>
+          <input type="text" id="cfgCustomName" class="settings-input" placeholder="Своё название вместо стандартного">
+        </div>
+        <!-- Selector with snapshot picker -->
+        <div class="config-section" id="cfgSelectorSection">
+          <label class="config-label">Элемент <span class="config-hint">(кликните на снимке или введите CSS)</span></label>
+          <div class="selector-row">
+            <input type="text" id="cfgSelector" class="settings-input" placeholder=".class, #id, [attr]">
+            <button class="btn btn-secondary" id="cfgPickBtn" title="Выбрать на снимке">📸 Выбрать</button>
+            <button class="btn btn-secondary" id="cfgSaveSelectorBtn" title="Сохранить селектор">💾</button>
+            <button class="btn btn-secondary" id="cfgLoadSelectorBtn" title="Из сохранённых">📋</button>
+          </div>
+        </div>
+        <!-- Value / variable -->
+        <div class="config-section" id="cfgValueSection">
+          <label class="config-label" id="cfgValueLabel">Значение</label>
+          <input type="text" id="cfgValue" class="settings-input" placeholder="">
+          <div class="config-var-hint">💡 Используйте <code>{{переменная}}</code> для подстановки</div>
+        </div>
+        <!-- SaveAs -->
+        <div class="config-section" id="cfgSaveAsSection">
+          <label class="config-label">Сохранить в переменную</label>
+          <div class="selector-row">
+            <span style="color:var(--mauve);font-weight:700;font-size:16px">{{</span>
+            <input type="text" id="cfgSaveAs" class="settings-input" placeholder="имя_переменной" style="flex:1">
+            <span style="color:var(--mauve);font-weight:700;font-size:16px">}}</span>
+          </div>
+        </div>
+        <!-- Set Mode (for set-variable) -->
+        <div class="form-group" id="cfgSetModeGroup" style="display:none">
+          <label class="config-label">Режим записи</label>
+          <select id="cfgSetMode" class="settings-input">
+            <option value="replace">📝 Записать (заменить)</option>
+            <option value="append">➕ Дополнить в конец</option>
+            <option value="prepend">⬆️ Дополнить в начало</option>
+          </select>
+        </div>
+        <!-- Press Enter -->
+        <div class="config-section" id="cfgEnterSection">
+          <label class="toggle-label"><input type="checkbox" id="cfgPressEnter"> Нажать Enter после ввода</label>
+        </div>
+        <!-- Wait type -->
+        <div class="config-section" id="cfgWaitSection">
+          <label class="config-label">Тип ожидания</label>
+          <select id="cfgWaitType" class="settings-select">
+            <option value="element">Ждать элемент</option>
+            <option value="time">Ждать N миллисекунд</option>
+          </select>
+          <input type="number" id="cfgWaitTime" class="settings-input" placeholder="1000" style="margin-top:6px;display:none">
+        </div>
+        <!-- Key -->
+        <div class="config-section" id="cfgKeySection">
+          <label class="config-label">Клавиша</label>
+          <select id="cfgKey" class="settings-select">
+            <option value="Enter">Enter</option>
+            <option value="Tab">Tab</option>
+            <option value="Escape">Escape</option>
+            <option value="Backspace">Backspace</option>
+            <option value="ArrowDown">Arrow Down</option>
+            <option value="ArrowUp">Arrow Up</option>
+            <option value="Space">Space</option>
+          </select>
+        </div>
+
+        <!-- Browser Init (profile + proxy) -->
+        <div class="config-section" id="cfgBrowserInitSection">
+          <label class="config-label">Профиль браузера</label>
+          <select id="cfgBrowserInitProfile" class="settings-select"></select>
+
+          <label class="config-label" style="margin-top:10px">Прокси <span class="config-hint">(ip:port или {{proxy}})</span></label>
+          <input type="text" id="cfgBrowserInitProxy" class="settings-input" placeholder="1.2.3.4:8080 или {{proxy}}">
+
+          <div class="form-row" style="margin-top:10px">
+            <div class="form-group" style="flex:1">
+              <label class="config-label">Proxy user (опц.)</label>
+              <input type="text" id="cfgBrowserInitProxyUser" class="settings-input" placeholder="{{puser}}">
+            </div>
+            <div class="form-group" style="flex:1">
+              <label class="config-label">Proxy pass (опц.)</label>
+              <input type="text" id="cfgBrowserInitProxyPass" class="settings-input" placeholder="{{ppass}}">
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top:10px">
+            <div class="form-group" style="flex:1">
+              <label class="config-label">Scope</label>
+              <select id="cfgBrowserInitScope" class="settings-select">
+                <option value="this">This window</option>
+                <option value="all">All windows</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex:1">
+              <label class="config-label">Timeout (ms)</label>
+              <input type="number" id="cfgBrowserInitTimeout" class="settings-input" value="120000" min="1000">
+            </div>
+          </div>
+
+          <div class="config-var-hint">ℹ️ Этот шаг всегда перезапускает контекст и переходит на startUrl макроса.</div>
+        </div>
+
+        <!-- Switch Profile -->
+        <div class="config-section" id="cfgSwitchProfileSection">
+          <label class="config-label">Профиль (один)</label>
+          <select id="cfgSwitchProfileName" class="settings-select"></select>
+
+          <label class="config-label" style="margin-top:10px">Или список профилей для ротации <span class="config-hint">(tg1,tg2,tg3 или {{list}})</span></label>
+          <input type="text" id="cfgSwitchProfileList" class="settings-input" placeholder="tg-acc1,tg-acc2">
+
+          <label class="config-label" style="margin-top:10px">Counter var <span class="config-hint">(для индекса ротации)</span></label>
+          <input type="text" id="cfgSwitchProfileCounterVar" class="settings-input" placeholder="_profile_index" value="_profile_index">
+
+          <label class="config-label" style="margin-top:10px">Scope</label>
+          <select id="cfgSwitchProfileScope" class="settings-select">
+            <option value="this">This window</option>
+            <option value="all">All windows</option>
+          </select>
+          <div class="config-var-hint">ℹ️ Переключение всегда делает restart context и идёт на startUrl.</div>
+        </div>
+
+        <!-- Proxy Rotate -->
+        <div class="config-section" id="cfgProxyRotateSection">
+          <label class="toggle-label"><input type="checkbox" id="cfgProxyApplyImmediately"> Применять сразу (restart context + startUrl)</label>
+          <div class="config-var-hint">ℹ️ Прокси применяется только при перезапуске контекста.</div>
+        </div>
+
+        <!-- Block: unified loop -->
+        <div class="config-section" id="cfgLoopUnifiedSection">
+          <div class="loop-mode-switcher">
+            <label class="config-label" style="margin-bottom:0">Режим цикла:</label>
+            <select id="cfgLoopMode" class="settings-select" style="width:auto" onchange="updateLoopModeFields(this.value)">
+              <option value="elements">🔁 По элементам</option>
+              <option value="table">📊 По таблице</option>
+              <option value="count">🔢 N раз</option>
+              <option value="while">🔄 Пока условие</option>
+            </select>
+          </div>
+          <!-- Table mode fields -->
+          <div id="cfgLoopTableFields" style="display:none">
+            <label class="config-label" style="margin-top:8px">Таблица данных</label>
+            <select id="cfgLoopTableName" class="settings-select"></select>
+            <div class="form-row" style="margin-top:8px">
+              <div class="form-group" style="flex:1"><label>Макс строк (0=все)</label><input type="number" id="cfgLoopMaxRows" class="settings-input" value="0" min="0"></div>
+              <div class="form-group" style="flex:1"><label>Пауза мин (с)</label><input type="number" id="cfgLoopDelayMin" class="settings-input" value="1" min="0"></div>
+              <div class="form-group" style="flex:1"><label>Пауза макс (с)</label><input type="number" id="cfgLoopDelayMax" class="settings-input" value="3" min="0"></div>
+            </div>
+            <label class="config-label" style="margin-top:8px; display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="cfgLoopRefreshTable" style="width:auto; margin:0;">
+              🔄 Обновлять каждый цикл <span style="color:var(--overlay); font-size:0.85em">(для динамического изменения таблицы)</span>
+            </label>
+          </div>
+          <!-- Elements mode fields -->
+          <div id="cfgLoopElementsFields" style="display:none">
+            <label class="config-label" style="margin-top:8px">Переменная для текста элемента</label>
+            <input type="text" id="cfgLoopVarName2" class="settings-input" placeholder="current_item">
+            <div class="form-row" style="margin-top:8px">
+              <div class="form-group" style="flex:1"><label>Макс элементов (0=все)</label><input type="number" id="cfgLoopMaxElements" class="settings-input" value="0" min="0"></div>
+              <div class="form-group" style="flex:1"><label>Пауза мин (с)</label><input type="number" id="cfgLoopElemDelayMin" class="settings-input" value="1" min="0"></div>
+              <div class="form-group" style="flex:1"><label>Пауза макс (с)</label><input type="number" id="cfgLoopElemDelayMax" class="settings-input" value="3" min="0"></div>
+            </div>
+            <label class="config-label" style="margin-top:8px; display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="cfgLoopRefreshElements" style="width:auto; margin:0;">
+              🔄 Обновлять каждый цикл <span style="color:var(--overlay); font-size:0.85em">(для динамически добавляемых элементов)</span>
+            </label>
+          </div>
+          <!-- Count mode fields -->
+          <div id="cfgLoopCountFields" style="display:none">
+            <div class="form-row" style="margin-top:8px">
+              <div class="form-group" style="flex:1"><label>Количество повторений</label><input type="number" id="cfgLoopCount" class="settings-input" value="1" min="1"></div>
+              <div class="form-group" style="flex:1"><label>Пауза мин (с)</label><input type="number" id="cfgLoopCountDelayMin" class="settings-input" value="1" min="0"></div>
+              <div class="form-group" style="flex:1"><label>Пауза макс (с)</label><input type="number" id="cfgLoopCountDelayMax" class="settings-input" value="3" min="0"></div>
+            </div>
+          </div>
+          <!-- While mode fields -->
+          <div id="cfgLoopWhileFields" style="display:none">
+            <div class="form-group" style="margin-top:8px">
+              <label>Переменная</label>
+              <input type="text" id="cfgLoopWhileCondVar" class="settings-input" placeholder="имя_переменной">
+            </div>
+            <div class="form-group">
+              <label>Оператор</label>
+              <select id="cfgLoopWhileOperator" class="settings-select">
+                <option value="not-empty">≠ пусто</option>
+                <option value="empty">= пусто</option>
+                <option value="equals">= равно</option>
+                <option value="not-equals">≠ не равно</option>
+                <option value="contains">содержит</option>
+                <option value="not-contains">не содержит</option>
+                <option value="starts-with">начинается с</option>
+                <option value="ends-with">заканчивается на</option>
+                <option value="greater-than">&gt; больше</option>
+                <option value="less-than">&lt; меньше</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Сравнить с</label>
+              <input type="text" id="cfgLoopWhileCompareValue" class="settings-input" placeholder="значение">
+            </div>
+            <div class="form-row" style="margin-top:8px">
+              <div class="form-group" style="flex:1"><label>Макс итераций (защита)</label><input type="number" id="cfgLoopWhileMaxIter" class="settings-input" value="1000" min="1"></div>
+              <div class="form-group" style="flex:1"><label>Пауза мин (с)</label><input type="number" id="cfgLoopWhileDelayMin" class="settings-input" value="1" min="0"></div>
+              <div class="form-group" style="flex:1"><label>Пауза макс (с)</label><input type="number" id="cfgLoopWhileDelayMax" class="settings-input" value="3" min="0"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Block: if -->
+        <div class="config-section" id="cfgIfSection">
+          <div class="form-group"><label>Переменная</label><input type="text" id="cfgCondVar" class="settings-input" placeholder="bot_name"></div>
+          <div class="form-group"><label>Оператор</label>
+            <select id="cfgOperator" class="settings-select">
+              <option value="not-empty">≠ пусто</option>
+              <option value="empty">= пусто</option>
+              <option value="equals">= равно</option>
+              <option value="not-equals">≠ не равно</option>
+              <option value="contains">содержит</option>
+              <option value="not-contains">не содержит</option>
+              <option value="starts-with">начинается с</option>
+              <option value="ends-with">заканчивается на</option>
+              <option value="greater-than">&gt; больше</option>
+              <option value="less-than">&lt; меньше</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Сравнить с</label><input type="text" id="cfgCompareValue" class="settings-input"></div>
+        </div>
+        <!-- Try-Except config -->
+        <div class="config-section" id="cfgTryExceptSection">
+          <label class="config-label">Поведение при ошибке</label>
+          <select id="cfgOnError" class="settings-select">
+            <option value="continue">pass — продолжить (игнорировать ошибку)</option>
+            <option value="custom">выполнить except-блок</option>
+            <option value="stop">остановить макрос</option>
+          </select>
+          <div class="form-group" style="margin-top:8px">
+            <label>Сохранить текст ошибки в переменную (опц.)</label>
+            <div class="selector-row">
+              <span style="color:var(--mauve);font-weight:700;font-size:16px">{{</span>
+              <input type="text" id="cfgExceptError" class="settings-input" placeholder="error_message" style="flex:1">
+              <span style="color:var(--mauve);font-weight:700;font-size:16px">}}</span>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:8px">
+            <label>Таймаут try (сек) — после истечения пропустить try-блок (опц.)</label>
+            <input type="number" id="cfgTryTimeoutSec" class="settings-input" placeholder="0 = без таймаута" value="0" min="0" step="1">
+          </div>
+          <div class="config-var-hint">
+            💡 <b>pass</b> — ошибка игнорируется, макрос идёт дальше.<br>
+            <b>except-блок</b> — при ошибке выполняются шаги внутри except.<br>
+            <b>stop</b> — макрос останавливается при ошибке.<br>
+            <b>Таймаут</b> — если try-блок выполняется дольше указанного времени, он будет пропущен, макрос продолжит выполнение после блока.
+          </div>
+        </div>
+        <!-- Python code editor -->
+        <div class="config-section" id="cfgPythonSection">
+          <label class="config-label">Python-код</label>
+          <textarea id="cfgPythonCode" class="python-editor" rows="12" placeholder="# Доступны все переменные макроса как Python-переменные&#10;# Изменения переменных автоматически вернутся в макрос&#10;&#10;# Пример:&#10;result = int(number) * 2&#10;print(f'Результат: {result}')"></textarea>
+          <div class="python-test-row">
+            <button class="btn btn-success btn-small" id="cfgPythonTest">▶ Тест</button>
+            <span class="python-test-status" id="cfgPythonTestStatus"></span>
+          </div>
+          <div class="python-test-output" id="cfgPythonTestOutput" style="display:none"></div>
+          <div class="config-var-hint">
+            💡 Все <code>{{переменные}}</code> макроса доступны как Python-переменные.<br>
+            Изменённые переменные автоматически возвращаются в макрос.<br>
+            <code>print()</code> выводит в консоль.
+          </div>
+        </div>
+        <!-- Autoreg blocks config sections -->
+        <div class="config-section" id="cfgGetSmsNumberSection" style="display:none">
+          <label class="config-label">SMS-сервис</label>
+          <select id="cfgSmsService" class="settings-select">
+            <option value="">Из настроек</option>
+            <option value="sms-activate">SMS-Activate</option>
+            <option value="5sim">5sim</option>
+            <option value="smshub">SMSHub</option>
+          </select>
+          <label class="config-label" style="margin-top:8px">Страна</label>
+          <select id="cfgSmsCountry" class="settings-select">
+            <option value="ru">🇷🇺 Россия</option>
+            <option value="ua">🇺🇦 Украина</option>
+            <option value="kz">🇰🇿 Казахстан</option>
+            <option value="us">🇺🇸 США</option>
+            <option value="gb">🇬🇧 Великобритания</option>
+            <option value="de">🇩🇪 Германия</option>
+          </select>
+          <div class="form-row" style="margin-top:8px">
+            <div class="form-group" style="flex:1"><label>Номер → в переменную</label><input type="text" id="cfgSavePhoneTo" class="settings-input" value="phone"></div>
+            <div class="form-group" style="flex:1"><label>SMS ID → в переменную</label><input type="text" id="cfgSaveSmsIdTo" class="settings-input" value="sms_id"></div>
+          </div>
+        </div>
+        <div class="config-section" id="cfgWaitSmsCodeSection" style="display:none">
+          <div class="form-row">
+            <div class="form-group" style="flex:1"><label>Переменная с SMS ID</label><input type="text" id="cfgSmsIdVar" class="settings-input" value="sms_id"></div>
+            <div class="form-group" style="flex:1"><label>Код → в переменную</label><input type="text" id="cfgSaveCodeTo" class="settings-input" value="sms_code"></div>
+          </div>
+          <div class="form-group"><label>Таймаут (секунд)</label><input type="number" id="cfgSmsTimeout" class="settings-input" value="120" min="30" max="600"></div>
+        </div>
+        <div class="config-section" id="cfgSolveCaptchaSection" style="display:none">
+          <label class="config-label">Тип капчи</label>
+          <select id="cfgCaptchaType" class="settings-select">
+            <option value="recaptcha-v2">reCAPTCHA v2</option>
+            <option value="recaptcha-v3">reCAPTCHA v3</option>
+            <option value="hcaptcha">hCaptcha</option>
+          </select>
+          <div class="form-group" style="margin-top:8px"><label>Site Key (если известен)</label><input type="text" id="cfgCaptchaSiteKey" class="settings-input" placeholder="Авто-определение если пусто"></div>
+          <label class="toggle-label" style="margin-top:8px"><input type="checkbox" id="cfgCaptchaAutoDetect" checked> 🔍 Авто-определение типа и ключа</label>
+          <div class="form-group" style="margin-top:8px"><label>Токен → в переменную</label><input type="text" id="cfgSaveTokenTo" class="settings-input" value="captcha_token"></div>
+        </div>
+        <div class="config-section" id="cfgSaveAccountSection" style="display:none">
+          <div class="form-row">
+            <div class="form-group" style="flex:1"><label>Переменная с номером</label><input type="text" id="cfgAccountPhoneVar" class="settings-input" value="phone"></div>
+            <div class="form-group" style="flex:1"><label>Переменная с ником</label><input type="text" id="cfgAccountUsernameVar" class="settings-input" value="username"></div>
+          </div>
+          <div class="form-group"><label>Переменная с session data</label><input type="text" id="cfgAccountSessionDataVar" class="settings-input" value="session_data"></div>
+          <div class="form-group">
+            <label>Статус</label>
+            <select id="cfgAccountStatus" class="settings-select">
+              <option value="registered">✅ Зарегистрирован</option>
+              <option value="failed">❌ Провалился</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Причина ошибки (для failed)</label><input type="text" id="cfgAccountReason" class="settings-input" placeholder="опционально"></div>
+        </div>
+        <div class="config-section" id="cfgCheckBlockedSection" style="display:none">
+          <label class="config-label">Тип проверки</label>
+          <select id="cfgCheckBlockedType" class="settings-select">
+            <option value="ip">🌐 IP/прокси в чёрном списке</option>
+            <option value="phone">📱 Телефон среди провалённых</option>
+          </select>
+          <div class="form-group" style="margin-top:8px"><label>Результат → в переменную</label><input type="text" id="cfgSaveBlockedTo" class="settings-input" value="is_blocked"></div>
+        </div>
+        <div class="config-section" id="cfgHumanDelaySection" style="display:none">
+          <div class="form-row">
+            <div class="form-group" style="flex:1"><label>Мин. секунд</label><input type="number" id="cfgHumanDelayMin" class="settings-input" value="2" min="0.5" step="0.5"></div>
+            <div class="form-group" style="flex:1"><label>Макс. секунд</label><input type="number" id="cfgHumanDelayMax" class="settings-input" value="5" min="0.5" step="0.5"></div>
+          </div>
+          <label class="toggle-label" style="margin-top:8px"><input type="checkbox" id="cfgHumanize" checked> 🎲 Гауссово распределение (более реалистично)</label>
+        </div>
+        <div class="config-section" id="cfgReleaseNumberSection" style="display:none">
+          <div class="form-group"><label>Переменная с SMS ID</label><input type="text" id="cfgReleaseSmsIdVar" class="settings-input" value="sms_id"></div>
+          <label class="config-label" style="margin-top:8px">Сервис</label>
+          <select id="cfgReleaseService" class="settings-select">
+            <option value="">Авто (из _sms_service)</option>
+            <option value="sms-activate">SMS-Activate</option>
+            <option value="5sim">5sim</option>
+            <option value="smshub">SMSHub</option>
+          </select>
+        </div>
+
+        <!-- User input -->
+        <div class="config-section" id="cfgUserInputSection">
+          <label class="config-label">Заголовок (что показать пользователю)</label>
+          <input type="text" id="cfgPromptTitle" class="settings-input" placeholder="Введите пароль для {{email}}">
+          <label class="config-label" style="margin-top:8px">Placeholder</label>
+          <input type="text" id="cfgPromptPlaceholder" class="settings-input" placeholder="Подсказка в поле ввода">
+          <label class="toggle-label" style="margin-top:8px"><input type="checkbox" id="cfgIsPassword"> Скрыть ввод (пароль)</label>
+          <div class="form-group" style="margin-top:8px">
+            <label>Таймаут (мс, 0 = бесконечно)</label>
+            <input type="number" id="cfgInputTimeout" class="settings-input" value="0" min="0">
+          </div>
+        </div>
+        <!-- Table save -->
+        <div class="config-section" id="cfgTableSaveSection">
+          <div class="form-group"><label>Таблица</label><input type="text" id="cfgSaveTableName" class="settings-input" placeholder="results"></div>
+          <div class="form-group"><label>Колонки (через запятую)</label><input type="text" id="cfgSaveColumns" class="settings-input" placeholder="{{name}},{{email}}"></div>
+        </div>
+        <!-- Read table -->
+        <div class="config-section" id="cfgReadTableSection">
+          <label class="config-label">Таблица</label>
+          <select id="cfgReadTableName" class="settings-select"></select>
+          <div class="form-row" style="margin-top:8px">
+            <div class="form-group" style="flex:1"><label>Строка (номер или {{переменная}})</label><input type="text" id="cfgReadRowIndex" class="settings-input" placeholder="0 или {{_loop_index}}"></div>
+            <div class="form-group" style="flex:1"><label>Колонка</label><input type="text" id="cfgReadColumnName" class="settings-input" placeholder="email"></div>
+          </div>
+        </div>
+        <!-- Assert -->
+        <div class="config-section" id="cfgAssertSection">
+          <div class="form-group"><label>Сообщение при провале (опц.)</label><input type="text" id="cfgAssertMessage" class="settings-input" placeholder="Например: Ожидалось не пусто, но получили пусто"></div>
+          <div class="config-var-hint">💡 Переменная / оператор / значение задаются выше в общей секции «Условие». Если условие ложно — макрос упадёт с этим сообщением.</div>
+        </div>
+        <!-- Screenshot -->
+        <div class="config-section" id="cfgScreenshotSection">
+          <div class="form-group"><label>Префикс файла / переменная (опц.)</label><input type="text" id="cfgScreenshotPrefix" class="settings-input" placeholder="например: error, before-click, {{step_name}}"></div>
+          <label class="toggle-label" style="margin-top:8px"><input type="checkbox" id="cfgScreenshotFullPage"> Скриншот всей страницы (full page)</label>
+          <div class="config-var-hint">📁 Сохраняется в <code>data/snapshots/runtime/&lt;macroId&gt;/&lt;prefix&gt;-&lt;ts&gt;.png</code>. Если префикс — имя переменной, путь к файлу записывается в неё.</div>
+        </div>
+        <!-- Extract (regex) -->
+        <div class="config-section" id="cfgExtractSection">
+          <div class="form-group"><label>Источник (текст или {{переменная}})</label><input type="text" id="cfgExtractSource" class="settings-input" placeholder="{{page_text}}"></div>
+          <div class="form-group"><label>Регулярное выражение</label><input type="text" id="cfgExtractPattern" class="settings-input" placeholder="например: id=(\d+)"></div>
+          <div class="form-row">
+            <div class="form-group" style="flex:1"><label>Флаги</label><input type="text" id="cfgExtractFlags" class="settings-input" placeholder="i" value="i"></div>
+            <div class="form-group" style="flex:1"><label>№ группы (0=весь матч)</label><input type="number" id="cfgExtractGroup" class="settings-input" value="1" min="0"></div>
+            <div class="form-group" style="flex:1"><label>Сохранить в</label><input type="text" id="cfgExtractSaveAs" class="settings-input" placeholder="extracted_id"></div>
+          </div>
+          <div class="config-var-hint">💡 Если шаблон не сработал — переменная получит пустую строку.</div>
+        </div>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" id="cancelStepConfig2">Отмена</button>
+        <button class="btn btn-warning" id="convertToPython" style="display:none">🐍 Конвертировать в Python</button>
+        <button class="btn btn-primary" id="confirmStepConfig">✅ Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SNAPSHOT PICKER MODAL -->
+  <div class="modal-overlay" id="snapshotModal" style="display:none">
+    <div class="modal modal-snapshot">
+      <div class="snapshot-header">
+        <button class="btn btn-secondary snapshot-nav" id="snapPrev">← Пред.</button>
+        <span id="snapInfo">Снимок 1 / 1</span>
+        <button class="btn btn-secondary snapshot-nav" id="snapNext">След. →</button>
+        <button class="modal-close" id="snapClose">✕</button>
+      </div>
+      <div class="snapshot-body">
+        <iframe id="snapFrame" sandbox="allow-scripts allow-same-origin"></iframe>
+      </div>
+      <div class="snapshot-footer">
+        <span class="snapshot-hint">👆 Кликните по элементу на снимке чтобы выбрать его</span>
+        <span id="snapSelectedInfo"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Run modal -->
+  <div class="modal-overlay" id="runModal" style="display:none">
+    <div class="modal" style="max-width:420px">
+      <h3>▶▶ Запуск макроса</h3>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer">
+          <input type="radio" name="runMode" value="once" checked onchange="updateRunModeUI()"> Один раз
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer">
+          <input type="radio" name="runMode" value="times" onchange="updateRunModeUI()"> Повторить N раз
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer">
+          <input type="radio" name="runMode" value="table" onchange="updateRunModeUI()"> 🔄 По таблице
+        </label>
+      </div>
+      <div class="form-group" id="runTimesGroup" style="display:none">
+        <label id="runTimesLabel">Количество:</label>
+        <input type="number" id="runTimes" class="settings-input" value="10" min="1">
+      </div>
+      <div class="form-group" id="runTableGroup" style="display:none">
+        <label>Таблица:</label>
+        <select id="runTableName" class="settings-select"><option value="">—</option></select>
+      </div>
+      <div class="form-group" id="runParallelCheck" style="display:none">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="runParallelEnabled" onchange="updateRunModeUI()"> 🪟 Параллельно (N окон)
+        </label>
+        <div style="font-size:11px;color:#7f849c;margin-left:24px;margin-top:2px">Строки таблицы распределяются по окнам (round-robin)</div>
+      </div>
+      <div class="form-group" id="runParallelGroup" style="display:none">
+        <label>🪟 Количество окон:</label>
+        <input type="number" id="runWindowCount" class="settings-input" value="2" min="1" max="10">
+      </div>
+      <div class="form-group" id="runDelayGroup" style="display:none">
+        <label>Пауза (сек):</label>
+        <div class="form-row">
+          <input type="number" id="runDelayMin" class="settings-input" value="3" min="0" style="flex:1" placeholder="мин">
+          <span style="padding:8px;color:#cdd6f4">—</span>
+          <input type="number" id="runDelayMax" class="settings-input" value="10" min="0" style="flex:1" placeholder="макс">
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="runFingerprintPerIteration"> 🎭 Менять отпечаток на каждой итерации
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:6px;margin-left:24px">
+          <input type="checkbox" id="runFingerprintSafeMode" checked> 🔒 Сохранять сессию (безопасный режим)
+        </label>
+        <div style="font-size:11px;color:#7f849c;margin-left:24px;margin-top:2px">Безопасный режим: меняет только минорную версию браузера и часовой пояс в пределах региона. Не разлогинивает Telegram и другие сайты.</div>
+      </div>
+      <div class="form-group">
+        <label>Профиль браузера:</label>
+        <select id="runProfileSelect" class="settings-select">
+          <option value="">Стандартный (без профиля)</option>
+        </select>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" onclick="document.getElementById('runModal').style.display='none'">Отмена</button>
+        <button class="btn btn-success" onclick="runWithOptions()">▶▶ Запустить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PYTHON OVERRIDE MODAL -->
+  <div class="modal-overlay" id="pyOverrideModal" style="display:none">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3 id="pyOverrideTitle">🐍 Python-код для шага</h3>
+        <button class="modal-close" id="pyOverrideClose">✕</button>
+      </div>
+      <div class="py-override-info" id="pyOverrideInfo"></div>
+      <div class="py-override-body">
+        <textarea id="pyOverrideCode" class="python-editor" rows="16" placeholder="# Этот код выполнится ВМЕСТО стандартной логики шага&#10;# Доступны: page (Playwright), все {{переменные}}&#10;&#10;# Пример:&#10;page.click('.btn-submit')&#10;import time&#10;time.sleep(1)"></textarea>
+        <div class="python-test-row">
+          <button class="btn btn-success btn-small" id="pyOverrideTest">▶ Тест</button>
+          <span class="python-test-status" id="pyOverrideTestStatus"></span>
+        </div>
+        <div class="python-test-output" id="pyOverrideTestOutput" style="display:none"></div>
+        <div class="config-var-hint">
+          💡 Если код заполнен — он выполняется <b>вместо</b> стандартной логики шага.<br>
+          Удалите код и сохраните чтобы вернуть стандартное поведение.
+        </div>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" id="pyOverrideCancel">Отмена</button>
+        <button class="btn btn-danger btn-small" id="pyOverrideClear" style="margin-right:auto">🗑 Убрать Python</button>
+        <button class="btn btn-primary" id="pyOverrideSave">✅ Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context menu -->
+  <div class="context-menu" id="contextMenu" style="display:none">
+    <button class="ctx-item" data-ctx="copy"><span class="ctx-icon">📋</span> Копировать</button>
+    <button class="ctx-item" data-ctx="paste"><span class="ctx-icon">📌</span> Вставить после</button>
+    <div class="ctx-submenu-wrap">
+      <button class="ctx-item ctx-has-sub" data-ctx="paste-to"><span class="ctx-icon">📄</span> Вставить в макрос ▶</button>
+      <div class="ctx-submenu" id="ctxPasteSubmenu"></div>
+    </div>
+    <div class="ctx-divider"></div>
+    <button class="ctx-item" data-ctx="edit"><span class="ctx-icon">✏️</span> Редактировать</button>
+    <button class="ctx-item" data-ctx="rename"><span class="ctx-icon">🏷️</span> Переименовать</button>
+    <button class="ctx-item" data-ctx="duplicate"><span class="ctx-icon">📑</span> Дублировать <span style="color:var(--overlay);font-size:11px">Ctrl+D</span></button>
+    <button class="ctx-item ctx-danger" data-ctx="delete"><span class="ctx-icon">🗑</span> Удалить</button>
+  </div>
+
+  <!-- Selector popup -->
+  <div class="selector-popup" id="selectorPopup" style="display:none">
+    <div class="selector-popup-title">📋 Сохранённые селекторы</div>
+    <div class="selector-popup-list" id="selectorPopupList"></div>
+    <div class="selector-popup-empty" id="selectorPopupEmpty" style="display:none">Пусто — сохраните первый селектор кнопкой 💾</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

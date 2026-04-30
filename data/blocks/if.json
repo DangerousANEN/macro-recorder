@@ -1,0 +1,1 @@
+{"name":"Условие (если)","icon":"❓","color":"#f9e2af","type":"block","fields":["conditionVar","operator","compareValue"]}
