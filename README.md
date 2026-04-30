@@ -53,6 +53,30 @@ npm install
 
 Конфиг для Claude Desktop / Cursor / Devin — см. `mcp/README.md`.
 
+13 tools: `list_macros`, `get_macro`, `run_macro`, `stop_macro`, `list_running`,
+`list_blocks`, `export_macro`, `import_macro`, плюс **agent debugging**:
+`get_run_events`, `get_last_failure`, `inspect_running_page`, `query_dom`,
+`patch_step`. Подробнее в [mcp/README.md](mcp/README.md#agent-debugging).
+
+## Agent debugging API
+
+Сервер отдаёт структурированный лог прогона + DOM-инспекцию, чтобы LLM-агент
+мог понимать что ломается без 1000 скриншотов:
+
+| Endpoint | Зачем |
+| --- | --- |
+| `GET /api/running/<runId>/events?since=<seq>` | поллить ход выполнения (step-completed, click-failed, var-saved…) |
+| `GET /api/running/<runId>/failures?last=1` | последняя ошибка с попытками селекторов |
+| `GET /api/running/<runId>/inspect` | URL/title + структурированное дерево body (без HTML-сырца) |
+| `POST /api/running/<runId>/query-dom` | найти элементы по `{selector, kind, limit}` — `kind = css \| xpath \| placeholder \| role` |
+| `PATCH /api/macros/<id>/steps/<path>` | точечный патч одного шага (например, добавить `fallbackSelectors`) |
+
+`stepPath` — точечный путь: `3` = индекс 3, `2.children.0` = первый child шага 2.
+
+Сценарий: запустил макрос → events показали `click-failed` на `step 5` →
+`get_last_failure` дал список перепробованных селекторов → `query_dom` нашёл
+реальный input → `patch_step` добавил `fallbackSelectors` → перезапустил.
+
 ## Запуск макросов
 
 ### Через UI

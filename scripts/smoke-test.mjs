@@ -109,6 +109,48 @@ try {
         await fetch(`${base}/api/macros/${impBody.id}`, { method: 'DELETE' });
       }
     }
+    // Patch-step (agent debug API): create a step then mutate it via PATCH.
+    const macroWithStep = await fetch(base + '/api/macros', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'smoke-patch',
+        steps: [{ id: 's1', action: 'click', cssSelector: '#old' }],
+      }),
+    }).then(r => r.json()).catch(() => null);
+    if (macroWithStep?.id) {
+      const patchRes = await fetch(
+        `${base}/api/macros/${macroWithStep.id}/steps/0`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ patch: { cssSelector: '#new', timeoutMs: 5000 } }),
+        },
+      );
+      log('PATCH /api/macros/:id/steps/0 → 200', patchRes.ok);
+      const patchBody = await patchRes.json().catch(() => ({}));
+      log('patch merged into step', patchBody?.step?.cssSelector === '#new' && patchBody?.step?.timeoutMs === 5000);
+
+      // Events endpoint should return a JSON shape even for an unknown runId.
+      const evRes = await fetch(`${base}/api/running/no-such-run/events`);
+      const evBody = await evRes.json().catch(() => null);
+      log('GET /api/running/<id>/events returns shape', evRes.ok && Array.isArray(evBody?.events) && typeof evBody?.seq === 'number');
+
+      // Failures endpoint
+      const failRes = await fetch(`${base}/api/running/no-such-run/failures?last=1`);
+      const failBody = await failRes.json().catch(() => null);
+      log('GET /api/running/<id>/failures?last=1 returns shape', failRes.ok && 'failure' in (failBody || {}));
+
+      // inspect/query-dom should 404 for unknown run.
+      const inspectRes = await fetch(`${base}/api/running/no-such-run/inspect`);
+      log('GET /api/running/<id>/inspect for unknown run → 404', inspectRes.status === 404);
+      const qRes = await fetch(`${base}/api/running/no-such-run/query-dom`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selector: 'body' }),
+      });
+      log('POST /api/running/<id>/query-dom for unknown run → 404', qRes.status === 404);
+
+      await fetch(`${base}/api/macros/${macroWithStep.id}`, { method: 'DELETE' });
+    }
     await fetch(`${base}/api/macros/${created.id}`, { method: 'DELETE' });
   }
 

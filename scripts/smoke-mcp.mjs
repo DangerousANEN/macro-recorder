@@ -19,6 +19,9 @@ const base = `http://127.0.0.1:${port}`;
 const REQUIRED_TOOLS = [
   'list_macros', 'get_macro', 'run_macro', 'stop_macro',
   'list_running', 'list_blocks', 'export_macro', 'import_macro',
+  // Agent debugging tools (PR #10)
+  'get_run_events', 'get_last_failure', 'inspect_running_page',
+  'query_dom', 'patch_step',
 ];
 
 let failures = 0;

@@ -113,6 +113,101 @@ const TOOLS = [
     },
     handler: async ({ macro }) => postJson('/api/macros/import', macro),
   },
+
+  // === Agent debugging tools ===========================================
+  {
+    name: 'get_run_events',
+    description: 'Return structured progress events for a running (or recently finished) macro. Use `since` to poll incrementally — only events with seq > since are returned. Replaces "watch the WebSocket"; lets the agent see step-completed, click-failed, fill-failed, var-saved, debug-dump, etc.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        runId: { type: 'string' },
+        since: { type: 'integer', minimum: 0, default: 0, description: 'Last seq seen; 0 = full history.' },
+      },
+      required: ['runId'],
+      additionalProperties: false,
+    },
+    handler: async ({ runId, since }) => {
+      const q = since ? `?since=${encodeURIComponent(since)}` : '';
+      return getJson(`/api/running/${encodeURIComponent(runId)}/events${q}`);
+    },
+  },
+  {
+    name: 'get_last_failure',
+    description: 'Return the most recent failure event for a run (or null). Includes which selectors were tried, the underlying error, and the step path. Use this first when a run errors — much cheaper than scanning the full event log.',
+    inputSchema: {
+      type: 'object',
+      properties: { runId: { type: 'string' } },
+      required: ['runId'],
+      additionalProperties: false,
+    },
+    handler: async ({ runId }) => getJson(`/api/running/${encodeURIComponent(runId)}/failures?last=1`),
+  },
+  {
+    name: 'inspect_running_page',
+    description: 'Snapshot the live Playwright page of a running macro: URL, title, readyState, cookie names, and a structured DOM outline (tag/id/classes/text/visible/children) truncated by depth and node count. Lets the agent see what the page actually contains without taking screenshots.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        runId: { type: 'string' },
+        depth: { type: 'integer', minimum: 1, maximum: 8, default: 4 },
+        maxNodes: { type: 'integer', minimum: 10, maximum: 1000, default: 200 },
+      },
+      required: ['runId'],
+      additionalProperties: false,
+    },
+    handler: async ({ runId, depth, maxNodes }) => {
+      const params = new URLSearchParams();
+      if (depth != null) params.set('depth', String(depth));
+      if (maxNodes != null) params.set('maxNodes', String(maxNodes));
+      const q = params.toString() ? `?${params}` : '';
+      return getJson(`/api/running/${encodeURIComponent(runId)}/inspect${q}`);
+    },
+  },
+  {
+    name: 'query_dom',
+    description: 'Query the live page of a running macro for elements matching a selector. kind = "css"|"xpath"|"placeholder"|"role". Returns up to `limit` matches with tag/id/classes/text/box/visible/attrs so the agent can pick the right selector before patching the macro.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        runId: { type: 'string' },
+        selector: { type: 'string' },
+        kind: { type: 'string', enum: ['css', 'xpath', 'placeholder', 'role'], default: 'css' },
+        limit: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
+      },
+      required: ['runId', 'selector'],
+      additionalProperties: false,
+    },
+    handler: async ({ runId, selector, kind, limit }) =>
+      postJson(`/api/running/${encodeURIComponent(runId)}/query-dom`, { selector, kind, limit }),
+  },
+  {
+    name: 'patch_step',
+    description: 'Surgically update one step inside a macro by stepPath (e.g. "3" or "2.children.0"). The patch object is shallow-merged into the target step. Useful for adding fallbackSelectors, fixing a cssSelector, or tweaking timeouts without rewriting the whole macro.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        macroId: { type: 'string' },
+        stepPath: { type: 'string', description: 'Dot-delimited path: "3" = step index 3; "2.children.0" = first child of step 2.' },
+        patch: { type: 'object', additionalProperties: true },
+      },
+      required: ['macroId', 'stepPath', 'patch'],
+      additionalProperties: false,
+    },
+    handler: async ({ macroId, stepPath, patch }) => {
+      const url = `/api/macros/${encodeURIComponent(macroId)}/steps/${encodeURIComponent(stepPath)}`;
+      const r = await fetch(BASE + url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patch }),
+      });
+      if (!r.ok) {
+        const t = await r.text().catch(() => '');
+        throw new Error(`PATCH ${url} → HTTP ${r.status} ${t}`);
+      }
+      return r.json();
+    },
+  },
 ];
 
 async function getJson(path) {

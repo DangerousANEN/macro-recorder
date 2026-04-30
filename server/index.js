@@ -5,7 +5,8 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync, exists
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
-import { runMacro, runStep, runUpTo, runMacroLoop, runMacroParallel, closeBrowser, stopCurrentRun } from './player.js';
+import { runMacro, runStep, runUpTo, runMacroLoop, runMacroParallel, closeBrowser, stopCurrentRun, setCurrentRunId, getActivePage } from './player.js';
+import { getEvents as getRunEvents, getLastFailure, getAllFailures, markFinished as markRunFinished } from './run-history.js';
 import { setupSettingsRoutes, loadSettings, saveSettings } from './settings.js';
 import { processBotsCsv } from './bots-process.js';
 import archiver from 'archiver';
@@ -688,6 +689,9 @@ function generateRunId() { return uuid().slice(0, 8); }
 
 function trackRun(runId, macroId, macroName, type = 'normal') {
   runningMacros.set(runId, { macroId, macroName, status: 'running', startTime: new Date().toISOString(), type });
+  // Tag broadcastStatus events with this runId so /api/running/<id>/events
+  // can return structured progress for an LLM agent.
+  setCurrentRunId(runId);
   broadcastRunningList();
 }
 
@@ -734,6 +738,9 @@ function completeRun(runId, success = true, error = null) {
     run.endTime = new Date().toISOString();
     broadcastRunningList();
     runningAborters.delete(runId);
+    // Schedule run-history GC. Events stay readable for a few minutes after
+    // the run ends so an agent can still inspect failures.
+    try { markRunFinished(runId); } catch {}
     // Remove from map after 30 seconds
     setTimeout(() => { runningMacros.delete(runId); broadcastRunningList(); }, 30000);
   }
@@ -763,6 +770,208 @@ app.post('/api/running/:runId/stop', async (req, res) => {
     res.status(500).json({ ok: false, error: e.message });
   }
 });
+
+// === Agent debugging API ===========================================
+// These endpoints exist so an LLM agent (e.g. via the MCP server) can inspect
+// what's happening in a running macro without subscribing to the WebSocket
+// and without taking screenshots.
+
+// API: get structured event log for a run.
+//   GET /api/running/<runId>/events?since=<seq>
+// Returns { seq, events: [{seq, ts, type, ...}] } where each event mirrors
+// what is broadcast over WS (step-completed, click-failed, fill-failed,
+// var-saved, debug-dump, etc.).
+app.get('/api/running/:runId/events', (req, res) => {
+  const since = parseInt(req.query.since || '0', 10) || 0;
+  const out = getRunEvents(req.params.runId, since);
+  res.json(out);
+});
+
+// API: get only failure events for a run (or null if none).
+//   GET /api/running/<runId>/failures
+//   GET /api/running/<runId>/failures?last=1
+app.get('/api/running/:runId/failures', (req, res) => {
+  if (req.query.last === '1') {
+    res.json({ failure: getLastFailure(req.params.runId) });
+    return;
+  }
+  res.json({ failures: getAllFailures(req.params.runId) });
+});
+
+// API: snapshot of the live Playwright page for the active run.
+//   GET /api/running/<runId>/inspect?depth=4&maxNodes=200
+// Returns { url, title, cookies, outline } where outline is a structured
+// (non-HTML) tree of the DOM truncated by depth and node count.
+app.get('/api/running/:runId/inspect', async (req, res) => {
+  const run = runningMacros.get(req.params.runId);
+  if (!run) return res.status(404).json({ error: 'Run not found' });
+  const p = getActivePage();
+  if (!p) return res.status(409).json({ error: 'No active page' });
+  const depth = Math.min(parseInt(req.query.depth || '4', 10) || 4, 8);
+  const maxNodes = Math.min(parseInt(req.query.maxNodes || '200', 10) || 200, 1000);
+  try {
+    const data = await p.evaluate(({ depth, maxNodes }) => {
+      const visited = { count: 0 };
+      function nodeInfo(el, d) {
+        if (visited.count >= maxNodes) return null;
+        visited.count++;
+        const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        const cs = el.classList ? Array.from(el.classList).slice(0, 6) : [];
+        const rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+        const visible = rect ? (rect.width > 0 && rect.height > 0) : false;
+        const out = {
+          tag: (el.tagName || '').toLowerCase(),
+          id: el.id || undefined,
+          classes: cs.length ? cs : undefined,
+          text: text || undefined,
+          visible,
+          childCount: el.children?.length || 0,
+        };
+        if (el.getAttribute) {
+          const ph = el.getAttribute('placeholder');
+          const aria = el.getAttribute('aria-label');
+          const role = el.getAttribute('role');
+          if (ph) out.placeholder = ph;
+          if (aria) out.ariaLabel = aria;
+          if (role) out.role = role;
+        }
+        if (d > 0 && el.children?.length) {
+          out.children = [];
+          for (const c of el.children) {
+            const ci = nodeInfo(c, d - 1);
+            if (!ci) break;
+            out.children.push(ci);
+          }
+        }
+        return out;
+      }
+      return {
+        url: location.href,
+        title: document.title,
+        readyState: document.readyState,
+        bodyOutline: nodeInfo(document.body, depth),
+        truncated: visited.count >= maxNodes,
+      };
+    }, { depth, maxNodes });
+    let cookies = [];
+    try {
+      const ctx = p.context?.();
+      if (ctx) cookies = await ctx.cookies();
+    } catch {}
+    res.json({ runId: req.params.runId, ...data, cookies: cookies.map(c => ({ name: c.name, domain: c.domain })) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// API: query the live page for elements matching a selector.
+//   POST /api/running/<runId>/query-dom { selector, kind?, limit? }
+// kind = 'css'|'xpath'|'placeholder'|'role'. Returns up to `limit` matches
+// (default 10, max 50) with tag/id/classes/text/box/visible/attrs.
+app.post('/api/running/:runId/query-dom', async (req, res) => {
+  const run = runningMacros.get(req.params.runId);
+  if (!run) return res.status(404).json({ error: 'Run not found' });
+  const p = getActivePage();
+  if (!p) return res.status(409).json({ error: 'No active page' });
+  const { selector, kind = 'css' } = req.body || {};
+  const limit = Math.min(parseInt(req.body?.limit ?? 10, 10) || 10, 50);
+  if (!selector || typeof selector !== 'string') return res.status(400).json({ error: 'selector required' });
+  try {
+    let loc;
+    if (kind === 'xpath') loc = p.locator('xpath=' + selector);
+    else if (kind === 'placeholder') loc = p.getByPlaceholder(selector);
+    else if (kind === 'role') loc = p.getByRole(selector);
+    else loc = p.locator(selector);
+    const total = await loc.count();
+    const take = Math.min(total, limit);
+    const matches = [];
+    for (let i = 0; i < take; i++) {
+      const handle = loc.nth(i);
+      try {
+        const info = await handle.evaluate(el => {
+          const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+          const cs = el.classList ? Array.from(el.classList).slice(0, 8) : [];
+          const rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+          return {
+            tag: (el.tagName || '').toLowerCase(),
+            id: el.id || undefined,
+            classes: cs.length ? cs : undefined,
+            text: text || undefined,
+            placeholder: el.getAttribute ? el.getAttribute('placeholder') || undefined : undefined,
+            ariaLabel: el.getAttribute ? el.getAttribute('aria-label') || undefined : undefined,
+            role: el.getAttribute ? el.getAttribute('role') || undefined : undefined,
+            type: el.getAttribute ? el.getAttribute('type') || undefined : undefined,
+            visible: rect ? rect.width > 0 && rect.height > 0 : false,
+            box: rect ? { x: rect.x, y: rect.y, w: rect.width, h: rect.height } : null,
+          };
+        });
+        matches.push(info);
+      } catch (e) {
+        matches.push({ error: e.message });
+      }
+    }
+    res.json({ runId: req.params.runId, selector, kind, total, matches });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// API: surgical patch of a single step inside a macro.
+//   PATCH /api/macros/<id>/steps/<stepPath> { patch: {...} }
+// stepPath is dot-delimited (e.g. "3" or "2.children.0"). The patch object is
+// shallow-merged into the target step. Returns the updated step.
+app.patch('/api/macros/:id/steps/:stepPath', (req, res) => {
+  const filePath = macroPath(req.params.id);
+  if (!existsSync(filePath)) return res.status(404).json({ error: 'Macro not found' });
+  const patch = req.body?.patch;
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+    return res.status(400).json({ error: 'patch must be an object' });
+  }
+  let macro;
+  try { macro = JSON.parse(readFileSync(filePath, 'utf-8')); } catch (e) {
+    return res.status(500).json({ error: 'Failed to read macro: ' + e.message });
+  }
+  const target = walkStepPath(macro.steps, req.params.stepPath);
+  if (!target) return res.status(404).json({ error: 'Step path not found' });
+  Object.assign(target, patch);
+  macro.updatedAt = new Date().toISOString();
+  try { writeFileSync(filePath, JSON.stringify(macro, null, 2)); } catch (e) {
+    return res.status(500).json({ error: 'Failed to save macro: ' + e.message });
+  }
+  res.json({ ok: true, step: target, stepPath: req.params.stepPath });
+});
+
+function walkStepPath(steps, path) {
+  if (!Array.isArray(steps) || !path) return null;
+  const parts = String(path).split('.');
+  let cur = steps;
+  let target = null;
+  while (parts.length) {
+    const p = parts.shift();
+    const idx = Number(p);
+    if (Number.isInteger(idx)) {
+      if (!Array.isArray(cur)) return null;
+      target = cur[idx];
+      if (!target) return null;
+      // Default descent through known child arrays for control-flow blocks.
+      if (parts.length) {
+        const nextKey = parts[0];
+        if (nextKey === 'children' || nextKey === 'finallyChildren' || nextKey === 'elseChildren') {
+          parts.shift();
+          cur = target[nextKey];
+        } else {
+          // numeric → look in `children` by default
+          cur = target.children;
+        }
+      }
+    } else {
+      // Named (e.g. "children") — set cur and keep going
+      if (!target) return null;
+      cur = target[p];
+    }
+  }
+  return target;
+}
 
 // API: close active Playwright browser (useful when UI got stuck)
 app.post('/api/browser/close', async (req, res) => {
