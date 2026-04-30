@@ -1,0 +1,13 @@
+{
+  "task": "tg3-fix",
+  "branch": "devin/1777472590-snapshot-gc-browser-init+tg3",
+  "acs": {
+    "AC1_smartClick_fallback": "PASS",
+    "AC2_smartFill_fallback": "PASS",
+    "AC3_k_heuristic": "PASS",
+    "AC4_macro_updated": "PASS",
+    "AC5_smoke": "PASS",
+    "AC6_macro_tracked": "PASS"
+  },
+  "smokeTest": { "command": "SMOKE_PORT=3706 node scripts/smoke-test.mjs", "result": "PASS" }
+}

@@ -1,0 +1,84 @@
+{
+    "id": "tg3-smoke-001",
+    "name": "tg3-smoke",
+    "steps": [
+        {
+            "action": "browser-init",
+            "timestamp": 1775826000000,
+            "profileName": "tg-acc1",
+            "proxy": "127.0.0.1:2080",
+            "scope": "this",
+            "timeoutMs": "120000",
+            "customName": "Init browser (tg-acc1 + proxy 127.0.0.1:2080)"
+        },
+        {
+            "action": "navigate",
+            "timestamp": 1775826000100,
+            "url": "https://web.telegram.org/a/",
+            "customName": "Navigate Telegram"
+        },
+        {
+            "action": "wait",
+            "timestamp": 1775826000150,
+            "waitType": "selector",
+            "cssSelector": "#telegram-search-input, input.input-search-input, input[placeholder*=\"Search\" i], [contenteditable=\"true\"][role=\"textbox\"]",
+            "waitTime": "30000",
+            "customName": "Wait for any Telegram search field"
+        },
+        {
+            "action": "wait",
+            "timestamp": 1775826000200,
+            "waitType": "time",
+            "waitTime": "1000",
+            "customName": "Settle 1s"
+        },
+        {
+            "action": "debug-dump",
+            "timestamp": 1775826000300,
+            "customName": "Dump state after load"
+        },
+        {
+            "action": "click",
+            "timestamp": 1775826000400,
+            "cssSelector": "#telegram-search-input",
+            "placeholder": "Search",
+            "fallbackSelectors": [
+                ".input-search-input",
+                "input[type=\"search\"]",
+                "input[placeholder*=\"Search\" i]",
+                "input[aria-label*=\"Search\" i]",
+                "[contenteditable=\"true\"][role=\"textbox\"]"
+            ],
+            "customName": "Click search input (resilient)"
+        },
+        {
+            "action": "type",
+            "timestamp": 1775826000500,
+            "cssSelector": "#telegram-search-input",
+            "placeholder": "Search",
+            "fallbackSelectors": [
+                ".input-search-input",
+                "input[type=\"search\"]",
+                "input[placeholder*=\"Search\" i]",
+                "input[aria-label*=\"Search\" i]",
+                "[contenteditable=\"true\"][role=\"textbox\"]"
+            ],
+            "value": "Saved Messages",
+            "pressEnter": true,
+            "customName": "Type query + Enter (resilient)"
+        },
+        {
+            "action": "wait",
+            "timestamp": 1775826000600,
+            "waitType": "time",
+            "waitTime": "1500",
+            "customName": "Wait 1.5s"
+        },
+        {
+            "action": "debug-dump",
+            "timestamp": 1775826000700,
+            "customName": "Dump state after search"
+        }
+    ],
+    "updatedAt": "2026-04-29T10:00:00.000Z"
+}
