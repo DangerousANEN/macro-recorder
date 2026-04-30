@@ -1,0 +1,14 @@
+{
+  "task": "refactor-editor",
+  "branch": "devin/1777473422-refactor-editor",
+  "acs": {
+    "AC1_module": "PASS",
+    "AC2_index_html": "PASS",
+    "AC3_high_traffic_migrated": "PASS",
+    "AC4_smoke": "PASS",
+    "AC5_node_check": "PASS"
+  },
+  "smokeTest": { "command": "SMOKE_PORT=3709 node scripts/smoke-test.mjs", "result": "PASS" },
+  "migratedCallSites": 11,
+  "remainingCallSites": "settings, persistent vars, tables, python/exec, run/run-loop/run-parallel/per-step run"
+}

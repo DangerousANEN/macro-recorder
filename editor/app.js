@@ -323,45 +323,37 @@ function moveStepIntoBlock(steps, srcPath, blockPath, childKey) {
 }
 
 // ==================== API ====================
+// Routes to window.MacroAPI (editor/macro-api.js) so URL/method assumptions
+// live in one module. Direct `fetch` is kept only at sites that haven't been
+// migrated yet (e.g. python/exec, settings, profiles, tables).
 async function fetchMacros() {
-  const res = await fetch(`${API}/macros`);
-  macros = await res.json();
+  macros = await MacroAPI.listMacros();
   renderMacroList();
 }
 
 async function fetchMacro(id) {
-  const res = await fetch(`${API}/macros/${id}`);
-  currentMacro = await res.json();
-  // Fetch available snapshots
+  currentMacro = await MacroAPI.getMacro(id);
   try {
-    const snapRes = await fetch(`${API}/macros/${id}/snapshots`);
-    availableSnapshots = await snapRes.json();
+    availableSnapshots = await MacroAPI.listSnapshots(id);
   } catch (e) { availableSnapshots = []; }
   renderEditor();
 }
 
 async function createMacro() {
-  const res = await fetch(`${API}/macros`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'Новый макрос' })
-  });
-  const macro = await res.json();
+  const macro = await MacroAPI.createMacro({ name: 'Новый макрос' });
   await fetchMacros();
   selectMacro(macro.id);
 }
 
 async function saveMacro() {
   if (!currentMacro) return;
-  await fetch(`${API}/macros/${currentMacro.id}`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(currentMacro)
-  });
+  await MacroAPI.updateMacro(currentMacro.id, currentMacro);
   fetchMacros();
 }
 
 async function deleteMacro() {
   if (!currentMacro || !confirm('Удалить макрос?')) return;
-  await fetch(`${API}/macros/${currentMacro.id}`, { method: 'DELETE' });
+  await MacroAPI.deleteMacro(currentMacro.id);
   currentMacro = null;
   showView('empty');
   fetchMacros();
@@ -2541,19 +2533,15 @@ document.getElementById('importMacroFile')?.addEventListener('change', async (e)
   try {
     const text = await file.text();
     const data = JSON.parse(text);
-    const res = await fetch(`${API}/macros/import`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      alert('Импорт не удался: ' + (err.error || res.status));
+    let imported;
+    try {
+      imported = await MacroAPI.importMacro(data);
+    } catch (e) {
+      alert('Импорт не удался: ' + e.message);
       return;
     }
-    const { id } = await res.json();
     await fetchMacros();
-    if (id) selectMacro(id);
+    if (imported && imported.id) selectMacro(imported.id);
   } catch (err) {
     alert('Не удалось распарсить JSON: ' + err.message);
   } finally {
@@ -3156,7 +3144,7 @@ function renderRunningMacros(macrosList) {
 
 async function stopRunningMacro(runId) {
   try {
-    await fetch(`${API}/running/${runId}/stop`, { method: 'POST' });
+    await MacroAPI.stopRun(runId);
     logToConsole('SYS', `⏹ Остановка запрошена (${runId})`, 'info');
   } catch (e) {
     logToConsole('SYS', `❌ ${e.message}`, 'error');
@@ -3175,8 +3163,7 @@ let profiles = {};
 
 async function fetchProfiles() {
   try {
-    const res = await fetch(`${API}/profiles`);
-    profiles = await res.json() || {};
+    profiles = (await MacroAPI.listProfiles()) || {};
     renderProfiles();
     updateRunProfileSelector();
   } catch (e) {
@@ -3231,20 +3218,10 @@ async function createProfile() {
   }
   
   try {
-    const res = await fetch(`${API}/profiles`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
-    });
-    
-    if (res.ok) {
-      document.getElementById('newProfileName').value = '';
-      fetchProfiles();
-      logToConsole('SYS', `✅ Профиль "${name}" создан`, 'info');
-    } else {
-      const error = await res.json();
-      alert('Ошибка: ' + error.error);
-    }
+    await MacroAPI.createProfile({ name });
+    document.getElementById('newProfileName').value = '';
+    fetchProfiles();
+    logToConsole('SYS', `✅ Профиль "${name}" создан`, 'info');
   } catch (e) {
     alert('Ошибка создания профиля: ' + e.message);
   }
@@ -3254,7 +3231,7 @@ async function deleteProfile(name) {
   if (!confirm(`Удалить профиль "${name}"?\nВсе данные будут потеряны!`)) return;
   
   try {
-    await fetch(`${API}/profiles/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    await MacroAPI.deleteProfile(name);
     fetchProfiles();
     logToConsole('SYS', `🗑 Профиль "${name}" удален`, 'info');
   } catch (e) {
@@ -3265,18 +3242,11 @@ async function deleteProfile(name) {
 async function launchProfile(name) {
   try {
     logToConsole('SYS', `🚀 Запуск профиля "${name}"...`, 'info');
-    const res = await fetch(`${API}/profiles/${encodeURIComponent(name)}/launch`, { method: 'POST' });
-    
-    if (res.ok) {
-      logToConsole('SYS', `✅ Профиль "${name}" открыт для ручного входа`, 'info');
-      fetchProfiles(); // Update last used
-    } else {
-      const error = await res.json();
-      logToConsole('SYS', `❌ Ошибка: ${error.error}`, 'error');
-      alert('Ошибка: ' + error.error);
-    }
+    await MacroAPI.launchProfile(name);
+    logToConsole('SYS', `✅ Профиль "${name}" открыт для ручного входа`, 'info');
+    fetchProfiles();
   } catch (e) {
-    logToConsole('SYS', `❌ Ошибка запуска профиля`, 'error');
+    logToConsole('SYS', `❌ Ошибка запуска профиля: ${e.message}`, 'error');
     alert('Ошибка запуска профиля: ' + e.message);
   }
 }
